@@ -1,4 +1,3 @@
-// ============= api/orders.js (Vercel serverless function) =============
 export default async function handler(req, res) {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,38 +9,98 @@ export default async function handler(req, res) {
         return;
     }
 
-    // Simple in-memory storage (resets on function cold starts)
-    // For persistent storage, you'd need a database like Vercel KV or external DB
-    if (!global.orders) {
-        global.orders = [];
-    }
+    // JSONBin.io configuration (free service)
+    const BIN_ID = process.env.JSONBIN_ID || 'your-bin-id'; // You'll set this in Vercel env vars
+    const API_KEY = process.env.JSONBIN_KEY || 'your-api-key'; // You'll set this in Vercel env vars
+    const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
     try {
         switch (req.method) {
             case 'GET':
-                res.status(200).json({ orders: global.orders });
+                try {
+                    const response = await fetch(JSONBIN_URL + '/latest', {
+                        headers: {
+                            'X-Master-Key': API_KEY
+                        }
+                    });
+                    const data = await response.json();
+                    const orders = data.record?.orders || [];
+                    res.status(200).json({ orders });
+                } catch (error) {
+                    res.status(200).json({ orders: [] });
+                }
                 break;
 
             case 'POST':
-                const newOrder = {
-                    id: Date.now().toString(),
-                    ...req.body,
-                    timestamp: new Date().toLocaleString()
-                };
-                global.orders.push(newOrder);
-                res.status(201).json({ message: 'Order created', order: newOrder });
+                try {
+                    // Get current orders
+                    const getResponse = await fetch(JSONBIN_URL + '/latest', {
+                        headers: {
+                            'X-Master-Key': API_KEY
+                        }
+                    });
+                    const currentData = await getResponse.json();
+                    const currentOrders = currentData.record?.orders || [];
+
+                    // Add new order
+                    const newOrder = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        ...req.body,
+                        timestamp: new Date().toLocaleString()
+                    };
+                    currentOrders.push(newOrder);
+
+                    // Update storage
+                    await fetch(JSONBIN_URL, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Master-Key': API_KEY
+                        },
+                        body: JSON.stringify({ orders: currentOrders })
+                    });
+
+                    res.status(201).json({ message: 'Order created', order: newOrder });
+                } catch (error) {
+                    res.status(500).json({ error: 'Failed to create order' });
+                }
                 break;
 
             case 'DELETE':
-                const { query } = req;
-                if (query.id) {
-                    // Delete specific order
-                    global.orders = global.orders.filter(order => order.id !== query.id);
-                    res.status(200).json({ message: 'Order deleted' });
-                } else {
-                    // Clear all orders
-                    global.orders = [];
-                    res.status(200).json({ message: 'All orders cleared' });
+                try {
+                    const { query } = req;
+                    
+                    // Get current orders
+                    const getResponse = await fetch(JSONBIN_URL + '/latest', {
+                        headers: {
+                            'X-Master-Key': API_KEY
+                        }
+                    });
+                    const currentData = await getResponse.json();
+                    const currentOrders = currentData.record?.orders || [];
+
+                    let updatedOrders;
+                    if (query.id) {
+                        // Delete specific order
+                        updatedOrders = currentOrders.filter(order => order.id !== query.id);
+                    } else {
+                        // Clear all orders
+                        updatedOrders = [];
+                    }
+
+                    // Update storage
+                    await fetch(JSONBIN_URL, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Master-Key': API_KEY
+                        },
+                        body: JSON.stringify({ orders: updatedOrders })
+                    });
+
+                    res.status(200).json({ message: query.id ? 'Order deleted' : 'All orders cleared' });
+                } catch (error) {
+                    res.status(500).json({ error: 'Failed to delete orders' });
                 }
                 break;
 
@@ -50,6 +109,6 @@ export default async function handler(req, res) {
         }
     } catch (error) {
         console.error('Handler error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: 'Internal server error: ' + error.message });
     }
 }
