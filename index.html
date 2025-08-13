@@ -492,7 +492,7 @@
                 <!-- Order Form Page -->
                 <div id="orderPage" class="page active">
                     <!-- Kitchen Closed Message -->
-                    <div id="kitchenClosedMessage" class="kitchen-closed-message">
+                    <div id="kitchenClosedMessage" class="kitchen-closed-message" style="display: none;">
                         <h2>🔴 Kitchen Closed</h2>
                         <p>Nobody is available to complete your order at the moment.</p>
                         <p>Please check back later when the kitchen reopens.</p>
@@ -607,9 +607,9 @@
             </div>
 
             <div class="sidebar">
-                <h3>Completed Orders</h3>
+                <h3>Recent Orders</h3>
                 <div id="completedOrdersList">
-                    <div class="loading">Loading completed orders...</div>
+                    <div class="loading">Loading recent orders...</div>
                 </div>
             </div>
         </div>
@@ -619,16 +619,6 @@
     <a href="?page=manager" class="manager-access" id="managerAccess">Manager</a>
 
     <script>
-        const API_BASE = '';
-
-        // Mock data storage (replace with actual API calls)
-        let mockData = {
-            orders: [],
-            completedOrders: [],
-            kitchenOpen: false,
-            nextOrderId: 1
-        };
-
         // Utility functions
         function getNZTime() {
             return new Date().toLocaleString('en-NZ', {
@@ -643,243 +633,153 @@
         }
 
         function generateOrderId() {
-            const id = mockData.nextOrderId.toString().padStart(3, '0');
-            mockData.nextOrderId++;
-            return id;
+            return Date.now().toString().slice(-6); // Last 6 digits of timestamp
         }
 
-        // API simulation functions
-        async function apiCall(endpoint, options = {}) {
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 200));
-            
-            if (endpoint === '/orders') {
-                if (options.method === 'GET') {
-                    return { orders: mockData.orders };
-                } else if (options.method === 'POST') {
-                    const newOrder = {
-                        id: generateOrderId(),
-                        displayId: mockData.nextOrderId - 1,
-                        ...JSON.parse(options.body),
-                        timestamp: getNZTime(),
-                        status: 'pending'
-                    };
-                    mockData.orders.push(newOrder);
-                    return { message: 'Order created', order: newOrder };
-                } else if (options.method === 'DELETE') {
-                    mockData.orders = [];
-                    return { message: 'All orders cleared' };
-                }
-            } else if (endpoint.startsWith('/orders/')) {
-                const orderId = endpoint.split('/')[2];
-                const order = mockData.orders.find(o => o.id === orderId);
-                if (options.method === 'GET') {
-                    return { order };
-                } else if (options.method === 'PUT') {
-                    const updates = JSON.parse(options.body);
-                    Object.assign(order, updates);
-                    
-                    // If completed, move to completed orders
-                    if (updates.status === 'completed') {
-                        mockData.completedOrders.push({...order, completedAt: getNZTime()});
-                        mockData.orders = mockData.orders.filter(o => o.id !== orderId);
-                    }
-                    return { message: 'Order updated', order };
-                }
-            } else if (endpoint === '/kitchen-status') {
-                if (options.method === 'GET') {
-                    return { isOpen: mockData.kitchenOpen };
-                } else if (options.method === 'POST') {
-                    const { isOpen } = JSON.parse(options.body);
-                    mockData.kitchenOpen = isOpen;
-                    return { message: 'Kitchen status updated', isOpen };
-                }
-            } else if (endpoint === '/completed-orders') {
-                return { orders: mockData.completedOrders };
-            }
-            
-            throw new Error('Not found');
-        }
-
+        // API functions
         async function getOrders() {
-            return await apiCall('/orders');
+            try {
+                const response = await fetch('/api/orders');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const orders = await response.json();
+                return { orders: Array.isArray(orders) ? orders : [] };
+            } catch (error) {
+                console.error('Failed to get orders:', error);
+                throw error;
+            }
         }
 
         async function addOrder(order) {
-            return await apiCall('/orders', {
-                method: 'POST',
-                body: JSON.stringify(order)
-            });
+            try {
+                const orderWithMeta = {
+                    id: generateOrderId(),
+                    ...order,
+                    timestamp: getNZTime(),
+                    status: 'pending'
+                };
+
+                // Get existing orders first
+                const existingResponse = await getOrders();
+                const existingOrders = existingResponse.orders || [];
+                
+                // Add new order to the array
+                const updatedOrders = [...existingOrders, orderWithMeta];
+
+                const response = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updatedOrders) // Send entire updated array
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                return { 
+                    message: 'Order created', 
+                    order: orderWithMeta 
+                };
+            } catch (error) {
+                console.error('Failed to add order:', error);
+                throw error;
+            }
         }
 
         async function getOrder(id) {
-            return await apiCall(`/orders/${id}`);
+            try {
+                const response = await getOrders();
+                const order = response.orders.find(o => o.id === id);
+                return { order };
+            } catch (error) {
+                console.error('Failed to get order:', error);
+                throw error;
+            }
         }
 
         async function updateOrderStatus(id, status) {
-            return await apiCall(`/orders/${id}`, {
-                method: 'PUT',
-                body: JSON.stringify({ status })
-            });
+            try {
+                const response = await getOrders();
+                const orders = response.orders;
+                const orderIndex = orders.findIndex(o => o.id === id);
+                
+                if (orderIndex === -1) {
+                    throw new Error('Order not found');
+                }
+
+                orders[orderIndex].status = status;
+                if (status === 'completed') {
+                    orders[orderIndex].completedAt = getNZTime();
+                }
+
+                // Update the entire orders array by replacing it
+                const updateResponse = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(orders) // Send entire array
+                });
+
+                if (!updateResponse.ok) throw new Error(`HTTP ${updateResponse.status}`);
+                
+                return { message: 'Order updated', order: orders[orderIndex] };
+            } catch (error) {
+                console.error('Failed to update order:', error);
+                throw error;
+            }
         }
 
         async function clearOrders() {
-            return await apiCall('/orders', {
-                method: 'DELETE'
-            });
+            try {
+                // Clear orders by sending an empty array
+                const response = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify([]) // Empty array to clear all orders
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return { message: 'All orders cleared' };
+            } catch (error) {
+                console.error('Failed to clear orders:', error);
+                throw error;
+            }
         }
 
         async function getKitchenStatus() {
-            return await apiCall('/kitchen-status');
+            try {
+                const response = await fetch('/api/orders/kitchen-status');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const status = await response.json();
+                return status;
+            } catch (error) {
+                console.error('Failed to get kitchen status:', error);
+                // Return default status if API call fails
+                return { isOpen: false };
+            }
         }
 
         async function setKitchenStatus(isOpen) {
-            return await apiCall('/kitchen-status', {
-                method: 'POST',
-                body: JSON.stringify({ isOpen })
-            });
-        }
+            try {
+                const response = await fetch('/api/orders/kitchen-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ isOpen, lastUpdated: getNZTime() })
+                });
 
-        async function getCompletedOrders() {
-            return await apiCall('/completed-orders');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return { message: 'Kitchen status updated', isOpen };
+            } catch (error) {
+                console.error('Failed to set kitchen status:', error);
+                throw error;
+            }
         }
 
         // UI Functions
-        function showMessage(type, message, duration = 3000) {
-            const messageEl = document.getElementById(`${type}Message`);
-            if (messageEl) {
-                messageEl.textContent = message;
-                messageEl.style.display = 'block';
-                setTimeout(() => {
-                    messageEl.style.display = 'none';
-                }, duration);
-            }
-        }
-
-        function getCurrentPage() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const page = urlParams.get('page');
-            const id = urlParams.get('id');
-            
-            if (id) return 'tracking';
-            return page === 'manager' ? 'manager' : 'order';
-        }
-
-        function getOrderIdFromUrl() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('id');
-        }
-
-        function goToOrderPage() {
-            window.location.href = window.location.pathname;
-        }
-
-        // Kitchen status management
-        let kitchenOpen = false;
-
-        async function toggleKitchenStatus() {
-            try {
-                kitchenOpen = !kitchenOpen;
-                await setKitchenStatus(kitchenOpen);
-                updateKitchenButton();
-            } catch (error) {
-                console.error('Failed to update kitchen status:', error);
-                kitchenOpen = !kitchenOpen;
-            }
-        }
-
-        function updateKitchenButton() {
-            const button = document.getElementById('kitchenToggle');
-            if (button) {
-                if (kitchenOpen) {
-                    button.textContent = '🟢 Kitchen Open';
-                    button.classList.remove('closed');
-                } else {
-                    button.textContent = '🔴 Kitchen Closed';
-                    button.classList.add('closed');
-                }
-            }
-        }
-
-        async function checkKitchenStatus() {
-            try {
-                const response = await getKitchenStatus();
-                kitchenOpen = response.isOpen || false;
-                updateOrderPageDisplay();
-                if (getCurrentPage() === 'manager') {
-                    updateKitchenButton();
-                }
-            } catch (error) {
-                console.error('Failed to check kitchen status:', error);
-                kitchenOpen = false;
-                updateOrderPageDisplay();
-            }
-        }
-
-        function updateOrderPageDisplay() {
-            const closedMessage = document.getElementById('kitchenClosedMessage');
-            const formContainer = document.getElementById('orderFormContainer');
-            
-            if (closedMessage && formContainer) {
-                if (kitchenOpen) {
-                    closedMessage.style.display = 'none';
-                    formContainer.style.display = 'block';
-                } else {
-                    closedMessage.style.display = 'block';
-                    formContainer.style.display = 'none';
-                }
-            }
-        }
-
-        // Smart refresh system
-        let lastOrderCount = 0;
-        let refreshInterval;
-        
-        function startSmartRefresh() {
-            refreshInterval = setInterval(async () => {
-                if (getCurrentPage() === 'manager') {
-                    try {
-                        const response = await getOrders();
-                        const currentOrderCount = response.orders ? response.orders.length : 0;
-                        
-                        if (currentOrderCount !== lastOrderCount) {
-                            if (currentOrderCount > lastOrderCount) {
-                                showNewOrderNotification();
-                            }
-                            lastOrderCount = currentOrderCount;
-                            loadOrders();
-                        }
-                        loadCompletedOrders();
-                    } catch (error) {
-                        console.error('Failed to check for new orders:', error);
-                    }
-                } else if (getCurrentPage() === 'order') {
-                    checkKitchenStatus();
-                    loadCompletedOrders();
-                } else if (getCurrentPage() === 'tracking') {
-                    loadOrderTracking();
-                    loadCompletedOrders();
-                }
-            }, 3000);
-        }
-
-        function stopSmartRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-
-        function showNewOrderNotification() {
-            const notification = document.getElementById('newOrderNotification');
-            if (notification) {
-                notification.style.display = 'block';
-                setTimeout(() => {
-                    notification.style.display = 'none';
-                }, 3000);
-            }
-        }
-
         function showPage(pageName) {
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
@@ -890,7 +790,19 @@
                 document.getElementById('headerSubtitle').textContent = 'Manage and complete food orders';
                 loadOrders();
                 checkKitchenStatus();
-                loadCompletedOrders();
+                loadRecentOrders();
+                startSmartRefresh();
+            } else if (pageName === 'tracking') {
+                document.getElementById('trackingPage').classList.add('active');
+                document.getElementById('headerSubtitle').textContent = 'Track your order';
+                loadOrderTracking();
+                loadRecentOrders();
+                startSmartRefresh();
+            } else {
+                document.getElementById('orderPage').classList.add('active');
+                document.getElementById('headerSubtitle').textContent = 'Place your order';
+                checkKitchenStatus();
+                loadRecentOrders();
                 startSmartRefresh();
             }
         }
@@ -919,6 +831,7 @@
                 window.location.href = `?id=${response.order.id}`;
                 
             } catch (error) {
+                console.error('Order submission error:', error);
                 showMessage('error', 'Failed to place order. Please try again.');
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Place Order';
@@ -939,13 +852,16 @@
                 const response = await getOrders();
                 const orders = response.orders || [];
                 
-                if (loading) loading.style.display = 'none';
-                lastOrderCount = orders.length;
+                // Filter out completed orders for the main view
+                const activeOrders = orders.filter(order => order.status !== 'completed');
                 
-                if (orders.length === 0) {
+                if (loading) loading.style.display = 'none';
+                lastOrderCount = activeOrders.length;
+                
+                if (activeOrders.length === 0) {
                     if (noOrdersMsg) noOrdersMsg.style.display = 'block';
                 } else if (container) {
-                    container.innerHTML = orders.map((order, index) => `
+                    container.innerHTML = activeOrders.map((order, index) => `
                         <div class="order-card">
                             <h3>Order #${order.id}</h3>
                             <div class="order-info">
@@ -974,6 +890,7 @@
                     `).join('');
                 }
             } catch (error) {
+                console.error('Load orders error:', error);
                 if (loading) loading.style.display = 'none';
                 if (container) container.innerHTML = '<div class="error-message" style="display: block;">Failed to load orders. Please refresh.</div>';
             }
@@ -982,9 +899,11 @@
         async function updateStatus(orderId, newStatus) {
             try {
                 await updateOrderStatus(orderId, newStatus);
+                showMessage('success', `Order #${orderId} updated to ${newStatus.replace('-', ' ')}`);
                 loadOrders();
-                loadCompletedOrders();
+                loadRecentOrders();
             } catch (error) {
+                console.error('Update status error:', error);
                 showMessage('error', 'Failed to update order status. Please try again.');
             }
         }
@@ -993,8 +912,11 @@
             if (confirm('Are you sure you want to clear all orders?')) {
                 try {
                     await clearOrders();
+                    showMessage('success', 'All orders cleared');
                     loadOrders();
+                    loadRecentOrders();
                 } catch (error) {
+                    console.error('Clear orders error:', error);
                     showMessage('error', 'Failed to clear orders. Please try again.');
                 }
             }
@@ -1039,6 +961,7 @@
                 updateStatusTimeline(order.status);
 
             } catch (error) {
+                console.error('Load order tracking error:', error);
                 if (trackingOrderDetails) {
                     trackingOrderDetails.innerHTML = `
                         <div class="error-message" style="display: block;">
@@ -1065,33 +988,39 @@
             });
         }
 
-        // Completed orders functions
-        async function loadCompletedOrders() {
-            const completedContainer = document.getElementById('completedOrdersList');
-            if (!completedContainer) return;
+        // Recent orders functions (replaces completed orders)
+        async function loadRecentOrders() {
+            const recentContainer = document.getElementById('completedOrdersList');
+            if (!recentContainer) return;
 
             try {
-                const response = await getCompletedOrders();
-                const completedOrders = response.orders || [];
+                const response = await getOrders();
+                const allOrders = response.orders || [];
+                
+                // Show recent orders (both completed and active, sorted by timestamp)
+                const recentOrders = allOrders
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                    .slice(0, 10); // Show last 10 orders
 
-                if (completedOrders.length === 0) {
-                    completedContainer.innerHTML = '<p style="color: #666; text-align: center;">No completed orders yet.</p>';
+                if (recentOrders.length === 0) {
+                    recentContainer.innerHTML = '<p style="color: #666; text-align: center;">No orders yet.</p>';
                 } else {
-                    completedContainer.innerHTML = completedOrders
-                        .slice(-10) // Show last 10 completed orders
-                        .reverse() // Most recent first
+                    recentContainer.innerHTML = recentOrders
                         .map(order => `
-                            <div class="completed-order">
+                            <div class="completed-order ${order.status === 'completed' ? '' : 'active-order'}" style="${order.status !== 'completed' ? 'background: #e3f2fd; border-color: #90caf9;' : ''}">
                                 <h4>Order #${order.id}</h4>
                                 <p><strong>Food:</strong> ${order.food}</p>
                                 <p><strong>Customer:</strong> ${order.name}</p>
                                 <p><strong>Room:</strong> ${order.room}</p>
-                                <p><strong>Completed:</strong> ${order.completedAt}</p>
+                                <p><strong>Status:</strong> <span class="status-badge status-${order.status}" style="display: inline; padding: 2px 8px; font-size: 0.8em;">${order.status.replace('-', ' ')}</span></p>
+                                <p><strong>Time:</strong> ${order.timestamp}</p>
+                                ${order.completedAt ? `<p><strong>Completed:</strong> ${order.completedAt}</p>` : ''}
                             </div>
                         `).join('');
                 }
             } catch (error) {
-                completedContainer.innerHTML = '<p style="color: #dc3545;">Failed to load completed orders.</p>';
+                console.error('Load recent orders error:', error);
+                recentContainer.innerHTML = '<p style="color: #dc3545;">Failed to load recent orders.</p>';
             }
         }
 
@@ -1119,25 +1048,6 @@
         window.addEventListener('beforeunload', stopSmartRefresh);
         window.addEventListener('popstate', init);
         document.addEventListener('DOMContentLoaded', init);
-
-        // Initialize with some sample data for demonstration
-        mockData.completedOrders = [
-            {
-                id: '001',
-                food: 'Pizza Margherita',
-                name: 'John Smith',
-                room: 'Room 101',
-                completedAt: getNZTime()
-            },
-            {
-                id: '002', 
-                food: 'Chicken Sandwich',
-                name: 'Jane Doe',
-                room: 'Conference Room A',
-                completedAt: getNZTime()
-            }
-        ];
-        mockData.nextOrderId = 3;
     </script>
 </body>
 </html>
