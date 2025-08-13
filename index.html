@@ -737,7 +737,7 @@
         
         // Lightweight check for data changes (only when user is active)
         function startEventDrivenUpdates() {
-            // Much less frequent check - only to detect external changes
+            // More frequent check for kitchen status changes - 5 seconds for customers, 15 seconds for data changes
             updateCheckInterval = setInterval(async () => {
                 // Only check if tab is visible and user is active
                 if (document.hidden) return;
@@ -747,7 +747,7 @@
                     let currentHash = '';
                     
                     if (currentPage === 'manager') {
-                        // Quick check for managers
+                        // Quick check for managers - every 15 seconds
                         const [ordersResp, recentResp, kitchenResp] = await Promise.all([
                             fetch('/api/orders').then(r => r.json()),
                             fetch('/api/orders?completed-orders=true').then(r => r.json()),
@@ -756,11 +756,19 @@
                         
                         currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
                     } else {
-                        // Lighter check for customers
+                        // For customers - check kitchen status more frequently (every 5 seconds)
                         const [recentResp, kitchenResp] = await Promise.all([
                             fetch('/api/orders?completed-orders=true').then(r => r.json()),
                             fetch('/api/orders?kitchen-status=true').then(r => r.json())
                         ]);
+                        
+                        // Check kitchen status change immediately
+                        if (kitchenResp.isOpen !== kitchenOpen) {
+                            console.error(`[KITCHEN UPDATE] Customer detected kitchen change: ${kitchenOpen} → ${kitchenResp.isOpen}`);
+                            kitchenOpen = kitchenResp.isOpen;
+                            updateOrderPageDisplay();
+                            showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 3000);
+                        }
                         
                         currentHash = calculateDataHash([], recentResp, kitchenResp.isOpen);
                     }
@@ -777,7 +785,7 @@
                     // Silent fail - don't spam console
                     debugLog('Update check error:', error.message);
                 }
-            }, 15000); // Only check every 15 seconds for external changes
+            }, getCurrentPage() === 'order' ? 5000 : 15000); // 5 seconds for customers, 15 for managers
         }
         
         function stopEventDrivenUpdates() {
@@ -853,7 +861,9 @@
                     break;
                     
                 case 'KITCHEN_STATUS_CHANGED':
-                    // Update kitchen display for everyone
+                    // Update kitchen display for everyone immediately
+                    kitchenOpen = data.isOpen; // Sync the status first
+                    
                     if (currentPage === 'manager') {
                         updateKitchenButton();
                     } else if (currentPage === 'order') {
@@ -861,7 +871,8 @@
                     }
                     
                     // Show notification to affected users
-                    showMessage('info', `Kitchen ${data.isOpen ? 'opened' : 'closed'}`, 3000);
+                    showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 3000);
+                    console.error(`[TRIGGER] Kitchen status updated to: ${data.isOpen}`);
                     break;
                     
                 case 'ORDERS_CLEARED':
@@ -1176,8 +1187,21 @@
         async function checkKitchenStatus() {
             try {
                 const response = await getKitchenStatus();
-                kitchenOpen = response.isOpen || false;
-                updateOrderPageDisplay();
+                const newKitchenStatus = response.isOpen || false;
+                
+                // Check if status actually changed
+                if (newKitchenStatus !== kitchenOpen) {
+                    console.error(`[KITCHEN CHECK] Status changed: ${kitchenOpen} → ${newKitchenStatus}`);
+                    kitchenOpen = newKitchenStatus;
+                    updateOrderPageDisplay();
+                    
+                    // Show notification to user
+                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 4000);
+                } else {
+                    kitchenOpen = newKitchenStatus;
+                    updateOrderPageDisplay();
+                }
+                
                 if (getCurrentPage() === 'manager') {
                     updateKitchenButton();
                 }
@@ -1192,14 +1216,23 @@
             const closedMessage = document.getElementById('kitchenClosedMessage');
             const formContainer = document.getElementById('orderFormContainer');
             
+            console.error(`[ORDER PAGE] Updating display - Kitchen is ${kitchenOpen ? 'OPEN' : 'CLOSED'}`);
+            
             if (closedMessage && formContainer) {
                 if (kitchenOpen) {
                     closedMessage.style.display = 'none';
                     formContainer.style.display = 'block';
+                    console.error(`[ORDER PAGE] Form shown - kitchen is open`);
                 } else {
                     closedMessage.style.display = 'block';
                     formContainer.style.display = 'none';
+                    console.error(`[ORDER PAGE] Form hidden - kitchen is closed`);
                 }
+            } else {
+                console.error(`[ORDER PAGE] Elements not found:`, { 
+                    closedMessage: !!closedMessage, 
+                    formContainer: !!formContainer 
+                });
             }
         }
 
