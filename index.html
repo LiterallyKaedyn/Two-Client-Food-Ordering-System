@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Food Order System</title>
     <style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Bungee:wght@400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bungee&display=swap');
 
         * {
             margin: 0;
@@ -15,7 +15,7 @@
         }
 
         body {
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #FF6B35 0%, #FF8E3C 100%);
             min-height: 100vh;
             padding: 20px;
@@ -60,8 +60,47 @@
             border-radius: 50px;
         }
 
+        .performance-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .perf-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .upstash-powered {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.1);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            color: rgba(255, 255, 255, 0.8);
+            font-family: 'Poppins', sans-serif;
+        }
+
         .header h1 {
-            font-family: 'Bungee', cursive;
+            font-family: 'Bungee', 'Arial Black', 'Helvetica Bold', sans-serif;
             font-size: 2.8em;
             margin-bottom: 10px;
             text-shadow: 3px 3px 0px #000;
@@ -70,7 +109,7 @@
         }
 
         .header p {
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             font-size: 1.2em;
             font-weight: 600;
             text-shadow: 2px 2px 0px #000;
@@ -85,7 +124,7 @@
         .content {
             flex: 2;
             padding: 40px;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
         .sidebar {
@@ -95,7 +134,7 @@
             padding: 20px;
             max-height: 80vh;
             overflow-y: auto;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
         .page {
@@ -122,7 +161,7 @@
             font-weight: 700;
             color: #000;
             font-size: 1.1em;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
         .form-group input, .form-group select, .form-group textarea {
@@ -133,7 +172,7 @@
             font-size: 1em;
             transition: all 0.3s ease;
             background: white;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             font-weight: 500;
         }
 
@@ -163,7 +202,7 @@
             transition: all 0.3s ease;
             text-transform: uppercase;
             letter-spacing: 1px;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             text-shadow: 1px 1px 0px #000;
         }
 
@@ -205,7 +244,7 @@
         }
 
         .order-card h3 {
-            font-family: 'Bungee', cursive;
+            font-family: 'Bungee', 'Arial Black', 'Helvetica Bold', sans-serif;
             font-size: 1.3em;
             margin-bottom: 15px;
             color: #FF6B35;
@@ -394,7 +433,7 @@
         }
 
         .kitchen-closed-message h2 {
-            font-family: 'Bungee', cursive;
+            font-family: 'Bungee', 'Arial Black', 'Helvetica Bold', sans-serif;
             font-size: 2.5em;
             margin-bottom: 20px;
             text-shadow: 3px 3px 0px #000;
@@ -405,7 +444,7 @@
             font-size: 1.3em;
             margin-bottom: 15px;
             font-weight: 600;
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
         .loading {
@@ -442,12 +481,6 @@
             animation: pulse 1s infinite;
             border: 3px solid #000;
             font-family: 'Poppins', sans-serif;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
         }
 
         .sidebar h3 {
@@ -508,7 +541,7 @@
         }
 
         .order-id-display h2 {
-            font-family: 'Bungee', cursive;
+            font-family: 'Bungee', 'Arial Black', 'Helvetica Bold', sans-serif;
             font-size: 3em;
             margin-bottom: 10px;
             text-shadow: 3px 3px 0px #000;
@@ -593,15 +626,28 @@
             .header p {
                 font-size: 1em;
             }
+
+            .performance-indicator {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin-top: 10px;
+                justify-content: center;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
+            <div class="performance-indicator">
+                <div class="perf-dot"></div>
+                <span>Upstash Redis</span>
+            </div>
             <h1>Are You Hungry?</h1>
             <p id="headerSubtitle">48 Hour Food Festival Catering</p>
             <p>(48 Hour Film Festival 2025)</p>
+            <div class="upstash-powered">⚡ Powered by Upstash</div>
         </div>
 
         <div class="main-layout">
@@ -724,12 +770,40 @@
     <a href="?page=manager" class="manager-access" id="managerAccess">Manager</a>
 
     <script>
-        // Debug mode - set to false to reduce console spam
-        const DEBUG_MODE = false;
+        // Enhanced debug mode with performance tracking
+        const DEBUG_MODE = true; // Enable to see Upstash performance
+        let performanceMetrics = {
+            requests: 0,
+            averageResponseTime: 0,
+            lastRequestTime: 0
+        };
         
         function debugLog(...args) {
             if (DEBUG_MODE) {
                 console.log(...args);
+            }
+        }
+
+        function trackPerformance(startTime) {
+            const endTime = performance.now();
+            const responseTime = endTime - startTime;
+            performanceMetrics.requests++;
+            performanceMetrics.averageResponseTime = 
+                (performanceMetrics.averageResponseTime * (performanceMetrics.requests - 1) + responseTime) / performanceMetrics.requests;
+            performanceMetrics.lastRequestTime = responseTime;
+            
+            debugLog(`⚡ Upstash Response Time: ${responseTime.toFixed(2)}ms (Avg: ${performanceMetrics.averageResponseTime.toFixed(2)}ms)`);
+            
+            // Update performance indicator based on speed
+            const perfDot = document.querySelector('.perf-dot');
+            if (perfDot) {
+                if (responseTime < 100) {
+                    perfDot.style.background = '#28a745'; // Green for fast
+                } else if (responseTime < 300) {
+                    perfDot.style.background = '#ffc107'; // Yellow for medium
+                } else {
+                    perfDot.style.background = '#dc3545'; // Red for slow
+                }
             }
         }
 
@@ -746,7 +820,7 @@
             });
         }
 
-        // UI Functions
+        // Enhanced UI Functions with performance feedback
         function showMessage(type, message, duration = 3000) {
             const messageEl = document.getElementById(`${type}Message`);
             if (messageEl) {
@@ -776,7 +850,7 @@
             window.location.href = window.location.pathname;
         }
 
-        // Event-driven update system - no more constant polling!
+        // Enhanced event-driven update system with performance optimization
         let lastDataHash = '';
         let lastOrderCount = 0;
         let updateCheckInterval;
@@ -788,42 +862,43 @@
                 recentCount: recentOrders.length,
                 kitchen: kitchenStatus
             });
-            return btoa(dataString).slice(0, 16); // Simple hash
+            return btoa(dataString).slice(0, 16);
         }
         
-        // Lightweight check for data changes (only when user is active)
+        // Optimized lightweight check for data changes
         function startEventDrivenUpdates() {
-            // More frequent check for kitchen status changes - 5 seconds for customers, 15 seconds for data changes
             updateCheckInterval = setInterval(async () => {
-                // Only check if tab is visible and user is active
                 if (document.hidden) return;
+                
+                const startTime = performance.now();
                 
                 try {
                     const currentPage = getCurrentPage();
                     let currentHash = '';
                     
                     if (currentPage === 'manager') {
-                        // Quick check for managers - every 15 seconds
                         const [ordersResp, recentResp, kitchenResp] = await Promise.all([
                             fetch('/api/orders').then(r => r.json()),
                             fetch('/api/orders?completed-orders=true').then(r => r.json()),
                             fetch('/api/orders?kitchen-status=true').then(r => r.json())
                         ]);
                         
+                        trackPerformance(startTime);
                         currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
                     } else {
-                        // For customers - check kitchen status more frequently (every 5 seconds)
                         const [recentResp, kitchenResp] = await Promise.all([
                             fetch('/api/orders?completed-orders=true').then(r => r.json()),
                             fetch('/api/orders?kitchen-status=true').then(r => r.json())
                         ]);
                         
+                        trackPerformance(startTime);
+                        
                         // Check kitchen status change immediately
                         if (kitchenResp.isOpen !== kitchenOpen) {
-                            console.error(`[KITCHEN UPDATE] Customer detected kitchen change: ${kitchenOpen} → ${kitchenResp.isOpen}`);
+                            debugLog(`[KITCHEN UPDATE] Customer detected kitchen change: ${kitchenOpen} → ${kitchenResp.isOpen}`);
                             kitchenOpen = kitchenResp.isOpen;
                             updateOrderPageDisplay();
-                            showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 3000);
+                            showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 3000);
                         }
                         
                         currentHash = calculateDataHash([], recentResp, kitchenResp.isOpen);
@@ -831,17 +906,16 @@
                     
                     // Only update if data actually changed
                     if (currentHash !== lastDataHash && lastDataHash !== '') {
-                        console.error(`[EVENT UPDATE] Data changed, triggering refresh`);
+                        debugLog(`[EVENT UPDATE] Data changed, triggering refresh`);
                         await handleDataChange(currentPage);
                     }
                     
                     lastDataHash = currentHash;
                     
                 } catch (error) {
-                    // Silent fail - don't spam console
                     debugLog('Update check error:', error.message);
                 }
-            }, getCurrentPage() === 'order' ? 5000 : 15000); // 5 seconds for customers, 15 for managers
+            }, getCurrentPage() === 'order' ? 10000 : 20000);
         }
         
         function stopEventDrivenUpdates() {
@@ -859,18 +933,16 @@
                     getKitchenStatus()
                 ]);
                 
-                // Check for new orders
                 const newOrderCount = ordersResp.orders?.length || 0;
                 if (newOrderCount > lastOrderCount) {
                     showNewOrderNotification();
                 }
                 lastOrderCount = newOrderCount;
                 
-                // Check kitchen status change
                 if (kitchenResp.isOpen !== kitchenOpen) {
                     kitchenOpen = kitchenResp.isOpen;
                     updateKitchenButton();
-                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'} by another manager`, 1000);
+                    showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'} by another manager`, 1000);
                 }
                 
                 await loadOrders();
@@ -879,35 +951,31 @@
                 if (kitchenResp.isOpen !== kitchenOpen) {
                     kitchenOpen = kitchenResp.isOpen;
                     updateOrderPageDisplay();
-                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 1000);
+                    showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 1000);
                 }
             } else if (currentPage === 'tracking') {
                 await loadOrderTracking();
             }
             
-            // Always update sidebar for everyone
             await loadRecentOrders();
         }
 
-        // Immediate update triggers - only update when actions happen
+        // Immediate update triggers with performance tracking
         async function triggerUIUpdate(action, data = {}) {
             const currentPage = getCurrentPage();
-            console.error(`[TRIGGER] ${action} - updating UI immediately`);
+            debugLog(`[TRIGGER] ${action} - updating UI immediately`);
             
             switch (action) {
                 case 'ORDER_PLACED':
-                    // Only update sidebar for everyone
                     await loadRecentOrders();
                     break;
                     
                 case 'ORDER_STATUS_UPDATED':
-                    // Update manager view and sidebar
                     if (currentPage === 'manager') {
                         await loadOrders();
                     }
                     await loadRecentOrders();
                     
-                    // Update tracking page if it's the same order
                     if (currentPage === 'tracking') {
                         const trackingOrderId = getOrderIdFromUrl();
                         if (trackingOrderId === data.orderId) {
@@ -917,8 +985,7 @@
                     break;
                     
                 case 'KITCHEN_STATUS_CHANGED':
-                    // Update kitchen display for everyone immediately
-                    kitchenOpen = data.isOpen; // Sync the status first
+                    kitchenOpen = data.isOpen;
                     
                     if (currentPage === 'manager') {
                         updateKitchenButton();
@@ -926,13 +993,11 @@
                         updateOrderPageDisplay();
                     }
                     
-                    // Show notification to affected users
                     showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 1000);
-                    console.error(`[TRIGGER] Kitchen status updated to: ${data.isOpen}`);
+                    debugLog(`[TRIGGER] Kitchen status updated to: ${data.isOpen}`);
                     break;
                     
                 case 'ORDERS_CLEARED':
-                    // Full refresh for managers only
                     if (currentPage === 'manager') {
                         await loadOrders();
                     }
@@ -940,13 +1005,11 @@
                     break;
                     
                 case 'ORDER_DELETED':
-                    // Update manager view and sidebar
                     if (currentPage === 'manager') {
                         await loadOrders();
                     }
                     await loadRecentOrders();
                     
-                    // If tracking page is showing the deleted order, show error
                     if (currentPage === 'tracking') {
                         const trackingOrderId = getOrderIdFromUrl();
                         if (trackingOrderId === data.orderId) {
@@ -964,13 +1027,15 @@
             }
         }
 
-        // API FUNCTIONS
+        // Enhanced API FUNCTIONS with performance tracking
         async function getOrders() {
+            const startTime = performance.now();
             try {
                 debugLog('Fetching orders from /api/orders');
                 const response = await fetch('/api/orders');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const orders = await response.json();
+                trackPerformance(startTime);
                 debugLog('Orders received:', orders.length, 'orders');
                 return { orders: Array.isArray(orders) ? orders : [] };
             } catch (error) {
@@ -980,6 +1045,7 @@
         }
 
         async function addOrder(order) {
+            const startTime = performance.now();
             try {
                 debugLog('Adding order:', order.food, 'for', order.name);
 
@@ -997,6 +1063,7 @@
                 }
 
                 const result = await response.json();
+                trackPerformance(startTime);
                 debugLog('Order added successfully:', result.order?.id);
                 
                 return result;
@@ -1018,13 +1085,14 @@
         }
 
         async function updateOrderStatus(id, status) {
+            const startTime = performance.now();
             try {
                 const updateData = { status };
                 if (status === 'completed') {
                     updateData.completedAt = getNZTime();
                 }
 
-                console.error(`[API CALL] PUT /api/orders?update-order=${id} with status: ${status}`);
+                debugLog(`[API CALL] PUT /api/orders?update-order=${id} with status: ${status}`);
                 const response = await fetch(`/api/orders?update-order=${id}`, {
                     method: 'PUT',
                     headers: {
@@ -1035,45 +1103,42 @@
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error(`[API CALL] Error Response:`, response.status, errorText);
+                    debugLog(`[API CALL] Error Response:`, response.status, errorText);
                     throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
                 
                 const result = await response.json();
-                console.error(`[API CALL] Success Response:`, result);
+                trackPerformance(startTime);
+                debugLog(`[API CALL] Success Response:`, result);
                 return result;
             } catch (error) {
-                console.error('[API CALL] Exception:', error);
+                debugLog('[API CALL] Exception:', error);
                 throw error;
             }
         }
 
         async function deleteOrder(orderId) {
             try {
-                console.error(`[DELETE ORDER] Starting deletion for Order ${orderId}`);
+                debugLog(`[DELETE ORDER] Starting deletion for Order ${orderId}`);
                 
-                // Authorization check
                 const authPassword = prompt('Enter manager password to delete this order:');
                 if (!authPassword) {
-                    console.error('[DELETE ORDER] Authorization cancelled by user');
+                    debugLog('[DELETE ORDER] Authorization cancelled by user');
                     return;
                 }
                 
-                // Simple password check (you can enhance this)
-                const correctPassword = 'delete123'; // Change this to your preferred password
+                const correctPassword = 'delete123';
                 if (authPassword !== correctPassword) {
                     showMessage('error', 'Incorrect password. Order not deleted.');
-                    console.error('[DELETE ORDER] Authorization failed - incorrect password');
+                    debugLog('[DELETE ORDER] Authorization failed - incorrect password');
                     return;
                 }
                 
-                // Double confirmation
                 if (!confirm(`Are you sure you want to permanently delete Order #${orderId}? This action cannot be undone.`)) {
-                    console.error('[DELETE ORDER] Deletion cancelled by user confirmation');
+                    debugLog('[DELETE ORDER] Deletion cancelled by user confirmation');
                     return;
                 }
                 
-                // Disable all buttons temporarily
                 const buttons = document.querySelectorAll('.status-btn, .delete-btn');
                 buttons.forEach(btn => {
                     btn.disabled = true;
@@ -1083,20 +1148,18 @@
                 });
                 
                 const result = await deleteOrderFromAPI(orderId);
-                console.error(`[DELETE ORDER] Success:`, result);
+                debugLog(`[DELETE ORDER] Success:`, result);
                 
                 showMessage('success', `Order #${orderId} has been permanently deleted`);
                 
-                // Trigger targeted UI update
                 await triggerUIUpdate('ORDER_DELETED', { orderId });
                 
-                console.error(`[DELETE ORDER] UI updated after deletion`);
+                debugLog(`[DELETE ORDER] UI updated after deletion`);
                 
             } catch (error) {
-                console.error('[DELETE ORDER] Error:', error);
+                debugLog('[DELETE ORDER] Error:', error);
                 showMessage('error', 'Failed to delete order: ' + error.message);
                 
-                // Re-enable buttons on error
                 const buttons = document.querySelectorAll('.status-btn, .delete-btn');
                 buttons.forEach(btn => {
                     btn.disabled = false;
@@ -1108,8 +1171,9 @@
         }
 
         async function deleteOrderFromAPI(orderId) {
+            const startTime = performance.now();
             try {
-                console.error(`[API CALL] DELETE /api/orders?delete-order=${orderId}`);
+                debugLog(`[API CALL] DELETE /api/orders?delete-order=${orderId}`);
                 const response = await fetch(`/api/orders?delete-order=${orderId}`, {
                     method: 'DELETE',
                     headers: {
@@ -1119,20 +1183,22 @@
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error(`[API CALL] Error Response:`, response.status, errorText);
+                    debugLog(`[API CALL] Error Response:`, response.status, errorText);
                     throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
                 
                 const result = await response.json();
-                console.error(`[API CALL] Delete Success Response:`, result);
+                trackPerformance(startTime);
+                debugLog(`[API CALL] Delete Success Response:`, result);
                 return result;
             } catch (error) {
-                console.error('[API CALL] Delete Exception:', error);
+                debugLog('[API CALL] Delete Exception:', error);
                 throw error;
             }
         }
 
         async function clearOrders() {
+            const startTime = performance.now();
             try {
                 debugLog('Clearing all orders');
                 const response = await fetch('/api/orders', {
@@ -1145,6 +1211,7 @@
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result = await response.json();
+                trackPerformance(startTime);
                 debugLog('Orders cleared successfully');
                 return result;
             } catch (error) {
@@ -1154,11 +1221,13 @@
         }
 
         async function getKitchenStatus() {
+            const startTime = performance.now();
             try {
                 debugLog('Fetching kitchen status');
                 const response = await fetch('/api/orders?kitchen-status=true');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const status = await response.json();
+                trackPerformance(startTime);
                 debugLog('Kitchen status:', status.isOpen ? 'Open' : 'Closed');
                 return status;
             } catch (error) {
@@ -1168,6 +1237,7 @@
         }
 
         async function setKitchenStatus(isOpen) {
+            const startTime = performance.now();
             try {
                 debugLog('Setting kitchen status to:', isOpen ? 'Open' : 'Closed');
                 const response = await fetch('/api/orders?kitchen-status=true', {
@@ -1180,6 +1250,7 @@
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result = await response.json();
+                trackPerformance(startTime);
                 debugLog('Kitchen status updated successfully');
                 return result;
             } catch (error) {
@@ -1189,11 +1260,13 @@
         }
 
         async function getRecentOrders() {
+            const startTime = performance.now();
             try {
                 debugLog('Fetching recent orders');
                 const response = await fetch('/api/orders?completed-orders=true');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const orders = await response.json();
+                trackPerformance(startTime);
                 debugLog('Recent orders received:', orders.length, 'orders');
                 return { orders: Array.isArray(orders) ? orders : [] };
             } catch (error) {
@@ -1212,14 +1285,12 @@
                 
                 await setKitchenStatus(kitchenOpen);
                 
-                // Trigger immediate UI update
                 await triggerUIUpdate('KITCHEN_STATUS_CHANGED', { isOpen: kitchenOpen });
                 
-                console.error(`[KITCHEN] Status changed from ${previousStatus} to ${kitchenOpen}`);
+                debugLog(`[KITCHEN] Status changed from ${previousStatus} to ${kitchenOpen}`);
                 
             } catch (error) {
                 console.error('Failed to update kitchen status:', error.message);
-                // Revert on error
                 kitchenOpen = !kitchenOpen;
                 updateKitchenButton();
                 updateOrderPageDisplay();
@@ -1245,14 +1316,11 @@
                 const response = await getKitchenStatus();
                 const newKitchenStatus = response.isOpen || false;
                 
-                // Check if status actually changed
                 if (newKitchenStatus !== kitchenOpen) {
-                    console.error(`[KITCHEN CHECK] Status changed: ${kitchenOpen} → ${newKitchenStatus}`);
+                    debugLog(`[KITCHEN CHECK] Status changed: ${kitchenOpen} → ${newKitchenStatus}`);
                     kitchenOpen = newKitchenStatus;
                     updateOrderPageDisplay();
-                    
-                    // Show notification to user
-                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 4000);
+                    showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 4000);
                 } else {
                     kitchenOpen = newKitchenStatus;
                     updateOrderPageDisplay();
@@ -1272,23 +1340,18 @@
             const closedMessage = document.getElementById('kitchenClosedMessage');
             const formContainer = document.getElementById('orderFormContainer');
             
-            console.error(`[ORDER PAGE] Updating display - Kitchen is ${kitchenOpen ? 'OPEN' : 'CLOSED'}`);
+            debugLog(`[ORDER PAGE] Updating display - Kitchen is ${kitchenOpen ? 'OPEN' : 'CLOSED'}`);
             
             if (closedMessage && formContainer) {
                 if (kitchenOpen) {
                     closedMessage.style.display = 'none';
                     formContainer.style.display = 'block';
-                    console.error(`[ORDER PAGE] Form shown - kitchen is open`);
+                    debugLog(`[ORDER PAGE] Form shown - kitchen is open`);
                 } else {
                     closedMessage.style.display = 'block';
                     formContainer.style.display = 'none';
-                    console.error(`[ORDER PAGE] Form hidden - kitchen is closed`);
+                    debugLog(`[ORDER PAGE] Form hidden - kitchen is closed`);
                 }
-            } else {
-                console.error(`[ORDER PAGE] Elements not found:`, { 
-                    closedMessage: !!closedMessage, 
-                    formContainer: !!formContainer 
-                });
             }
         }
 
@@ -1297,21 +1360,16 @@
             if (notification) {
                 notification.style.display = 'block';
                 
-                // Enhanced notification with sound and longer display
                 try {
-                    // Play notification sound
                     new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhDjWCyPPPfTIGHm7A7+OZSA0NVqzn77NdGAg+ltryxnkpBSl+zPLaizsIGGS57OOYTgwOUarm7bliFg06kdDzyn0vBSF0xe/glEILElyx6OyrWBUIQ5zd8sFuIAU2jdXzzn1uBiJ0xe/glEILElyx6OyrWBUIQ5zd8sFuIAU2jdXzzn1uBg==').play().catch(() => {});
-                } catch (e) {
-                    // Silent fail for browsers that don't support audio
-                }
+                } catch (e) {}
                 
-                // Make notification more prominent with pulsing
                 notification.style.animation = 'pulse 0.5s infinite';
                 
                 setTimeout(() => {
                     notification.style.display = 'none';
                     notification.style.animation = '';
-                }, 5000); // Show for 5 seconds instead of 3
+                }, 5000);
             }
         }
 
@@ -1362,14 +1420,11 @@
                 const response = await addOrder(order);
                 this.reset();
                 
-                console.error(`[NEW ORDER] Order placed successfully: ${response.order?.id}`);
+                debugLog(`[NEW ORDER] Order placed successfully: ${response.order?.id}`);
                 
-                // Trigger immediate UI update for the sidebar only
                 await triggerUIUpdate('ORDER_PLACED', { orderId: response.order?.id });
                 
-                // Redirect to tracking page with the returned order ID
                 if (response.order && response.order.id) {
-                    // Small delay to ensure the order appears in the system
                     setTimeout(() => {
                         window.location.href = `?id=${response.order.id}`;
                     }, 500);
@@ -1441,7 +1496,7 @@
                         </div>
                     `).join('');
                     
-                    // Add event listeners to buttons after creating them
+                    // Add event listeners to buttons
                     const statusButtons = container.querySelectorAll('.status-btn');
                     statusButtons.forEach(button => {
                         button.addEventListener('click', function(e) {
@@ -1451,17 +1506,14 @@
                             const orderId = this.getAttribute('data-order-id');
                             const newStatus = this.getAttribute('data-status');
                             
-                            console.error(`[Button Click] Order: ${orderId}, New Status: ${newStatus}`);
+                            debugLog(`[Button Click] Order: ${orderId}, New Status: ${newStatus}`);
                             
                             if (orderId && newStatus) {
                                 updateStatus(orderId, newStatus);
-                            } else {
-                                console.error('[Button Click] Missing orderId or newStatus', { orderId, newStatus });
                             }
                         });
                     });
 
-                    // Add event listeners to delete buttons
                     const deleteButtons = container.querySelectorAll('.delete-btn');
                     deleteButtons.forEach(button => {
                         button.addEventListener('click', function(e) {
@@ -1470,12 +1522,10 @@
                             
                             const orderId = this.getAttribute('data-order-id');
                             
-                            console.error(`[Delete Button Click] Order: ${orderId}`);
+                            debugLog(`[Delete Button Click] Order: ${orderId}`);
                             
                             if (orderId) {
                                 deleteOrder(orderId);
-                            } else {
-                                console.error('[Delete Button Click] Missing orderId', { orderId });
                             }
                         });
                     });
@@ -1489,9 +1539,8 @@
 
         async function updateStatus(orderId, newStatus) {
             try {
-                console.error(`[UPDATE STATUS] Starting update for Order ${orderId} to ${newStatus}`);
+                debugLog(`[UPDATE STATUS] Starting update for Order ${orderId} to ${newStatus}`);
                 
-                // Disable all buttons temporarily to prevent double-clicks
                 const buttons = document.querySelectorAll('.status-btn');
                 buttons.forEach(btn => {
                     btn.disabled = true;
@@ -1499,24 +1548,21 @@
                 });
                 
                 const result = await updateOrderStatus(orderId, newStatus);
-                console.error(`[UPDATE STATUS] Success:`, result);
+                debugLog(`[UPDATE STATUS] Success:`, result);
                 
                 showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
                 
-                // Trigger targeted UI update
                 await triggerUIUpdate('ORDER_STATUS_UPDATED', { orderId, newStatus });
                 
-                console.error(`[UPDATE STATUS] UI updated for affected views`);
+                debugLog(`[UPDATE STATUS] UI updated for affected views`);
                 
             } catch (error) {
-                console.error('[UPDATE STATUS] Error:', error);
+                debugLog('[UPDATE STATUS] Error:', error);
                 showMessage('error', 'Failed to update order status: ' + error.message);
                 
-                // Re-enable buttons on error
                 const buttons = document.querySelectorAll('.status-btn');
                 buttons.forEach(btn => {
                     btn.disabled = false;
-                    // Restore original text based on button's data attributes
                     const status = btn.getAttribute('data-status');
                     switch(status) {
                         case 'accepted': btn.textContent = 'Accept'; break;
@@ -1534,10 +1580,9 @@
                     await clearOrders();
                     showMessage('success', 'All orders cleared');
                     
-                    // Trigger targeted UI update
                     await triggerUIUpdate('ORDERS_CLEARED');
                     
-                    console.error(`[CLEAR ORDERS] All orders cleared and UI updated`);
+                    debugLog(`[CLEAR ORDERS] All orders cleared and UI updated`);
                     
                 } catch (error) {
                     console.error('Clear orders error:', error.message);
@@ -1644,7 +1689,7 @@
             }
         }
 
-        // Show manager access link only on triple-click of header
+        // Show manager access link on triple-click
         let clickCount = 0;
         document.querySelector('.header').addEventListener('click', function() {
             clickCount++;
@@ -1662,13 +1707,12 @@
         function init() {
             const currentPage = getCurrentPage();
             
-            // Initialize tracking variables
             lastOrderCount = 0;
             lastDataHash = '';
             
             showPage(currentPage);
             
-            console.error(`[INIT] Application initialized on ${currentPage} page with event-driven updates`);
+            debugLog(`[INIT] Application initialized on ${currentPage} page with Upstash Redis`);
         }
 
         // Clean up intervals when page unloads

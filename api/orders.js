@@ -1,5 +1,5 @@
-// api/orders.js - Vercel KV Storage version
-import { kv } from '@vercel/kv';
+// api/orders.js - Upstash Redis version (Unlimited requests + Ultra fast)
+import { Redis } from '@upstash/redis';
 
 export default async function handler(req, res) {
   // Add CORS headers
@@ -23,25 +23,29 @@ export default async function handler(req, res) {
 
     console.log(`[API] Parsed URL - pathname: ${pathname}, search: ${urlObj.search}`);
 
-    // KV storage key
+    // Initialize Upstash Redis client
+    const redis = Redis.fromEnv();
+    
+    // Redis keys
     const DATA_KEY = 'food_order_data';
 
-    // Helper to get data from Vercel KV
+    // Helper to get data from Upstash Redis
     async function getCurrentData() {
       try {
-        console.log('[API] Reading data from Vercel KV');
+        console.log('[API] Reading data from Upstash Redis');
         
-        const data = await kv.get(DATA_KEY);
+        const data = await redis.get(DATA_KEY);
         
         if (!data) {
-          console.log('[API] No data found in KV, creating default data');
+          console.log('[API] No data found in Redis, creating default data');
           const defaultData = {
             orders: [],
             completedOrders: [],
             kitchenOpen: false,
-            nextOrderId: 1
+            nextOrderId: 1,
+            lastUpdated: new Date().toISOString()
           };
-          await kv.set(DATA_KEY, defaultData);
+          await redis.set(DATA_KEY, defaultData);
           return defaultData;
         }
 
@@ -50,7 +54,8 @@ export default async function handler(req, res) {
           orders: [],
           completedOrders: Array.isArray(data.completedOrders) ? data.completedOrders : [],
           kitchenOpen: typeof data.kitchenOpen === 'boolean' ? data.kitchenOpen : false,
-          nextOrderId: typeof data.nextOrderId === 'number' ? data.nextOrderId : 1
+          nextOrderId: typeof data.nextOrderId === 'number' ? data.nextOrderId : 1,
+          lastUpdated: data.lastUpdated || new Date().toISOString()
         };
 
         // Validate and filter orders array
@@ -65,37 +70,44 @@ export default async function handler(req, res) {
           });
         }
 
-        console.log(`[API] Data loaded from KV - ${validatedData.orders.length} active orders, ${validatedData.completedOrders.length} completed, kitchen: ${validatedData.kitchenOpen}`);
+        console.log(`[API] Data loaded from Redis - ${validatedData.orders.length} active, ${validatedData.completedOrders.length} completed, kitchen: ${validatedData.kitchenOpen}`);
         return validatedData;
       } catch (err) {
-        console.error('[API] Could not read from KV:', err.message);
+        console.error('[API] Could not read from Redis:', err.message);
         // Return default data structure
         const defaultData = {
           orders: [],
           completedOrders: [],
           kitchenOpen: false,
-          nextOrderId: 1
+          nextOrderId: 1,
+          lastUpdated: new Date().toISOString()
         };
         
-        // Try to create the default data in KV
+        // Try to create the default data in Redis
         try {
-          await kv.set(DATA_KEY, defaultData);
-          console.log('[API] Created new data in KV with defaults');
+          await redis.set(DATA_KEY, defaultData);
+          console.log('[API] Created new data in Redis with defaults');
         } catch (createErr) {
-          console.error('[API] Could not create data in KV:', createErr.message);
+          console.error('[API] Could not create data in Redis:', createErr.message);
         }
         
         return defaultData;
       }
     }
 
-    // Helper to save data to Vercel KV
+    // Helper to save data to Upstash Redis
     async function saveData(data) {
       try {
-        await kv.set(DATA_KEY, data);
-        console.log('[API] Data saved successfully to Vercel KV');
+        // Add timestamp for debugging
+        data.lastUpdated = new Date().toISOString();
+        
+        await redis.set(DATA_KEY, data);
+        console.log('[API] Data saved successfully to Upstash Redis');
+        
+        // Optional: Set expiration for automatic cleanup (e.g., 30 days)
+        await redis.expire(DATA_KEY, 30 * 24 * 60 * 60); // 30 days
       } catch (err) {
-        console.error('[API] Failed to save data to KV:', err.message);
+        console.error('[API] Failed to save data to Redis:', err.message);
         throw err;
       }
     }
@@ -138,7 +150,8 @@ export default async function handler(req, res) {
           const data = await getCurrentData();
           console.log(`[API] Kitchen status GET - returning: ${data.kitchenOpen}`);
           return res.status(200).json({ 
-            isOpen: data.kitchenOpen
+            isOpen: data.kitchenOpen,
+            lastUpdated: data.lastUpdated
           });
         } catch (err) {
           console.error('[API] Failed to get kitchen status:', err.message);
@@ -160,11 +173,12 @@ export default async function handler(req, res) {
           console.log(`[API] Kitchen status POST - updating to: ${data.kitchenOpen}`);
           
           await saveData(data);
-          console.log('[API] Kitchen status POST - data saved successfully to KV');
+          console.log('[API] Kitchen status POST - data saved successfully to Redis');
 
           return res.status(200).json({ 
             success: true, 
-            isOpen: data.kitchenOpen
+            isOpen: data.kitchenOpen,
+            lastUpdated: data.lastUpdated
           });
         } catch (err) {
           console.error('[API] Failed to update kitchen status:', err.message);
