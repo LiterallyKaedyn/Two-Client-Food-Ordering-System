@@ -626,28 +626,15 @@
             .header p {
                 font-size: 1em;
             }
-
-            .performance-indicator {
-                position: relative;
-                top: auto;
-                right: auto;
-                margin-top: 10px;
-                justify-content: center;
-            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="performance-indicator">
-                <div class="perf-dot"></div>
-                <span>Upstash Redis</span>
-            </div>
             <h1>Are You Hungry?</h1>
             <p id="headerSubtitle">48 Hour Food Festival Catering</p>
             <p>(48 Hour Film Festival 2025)</p>
-            <div class="upstash-powered">⚡ Powered by Upstash</div>
         </div>
 
         <div class="main-layout">
@@ -765,6 +752,10 @@
             </div>
         </div>
     </div>
+    
+    <div class="footer">
+        ⚡ Powered by Upstash Redis
+    </div>
 
     <!-- Hidden manager access link -->
     <a href="?page=manager" class="manager-access" id="managerAccess">Manager</a>
@@ -793,18 +784,6 @@
             performanceMetrics.lastRequestTime = responseTime;
             
             debugLog(`⚡ Upstash Response Time: ${responseTime.toFixed(2)}ms (Avg: ${performanceMetrics.averageResponseTime.toFixed(2)}ms)`);
-            
-            // Update performance indicator based on speed
-            const perfDot = document.querySelector('.perf-dot');
-            if (perfDot) {
-                if (responseTime < 100) {
-                    perfDot.style.background = '#28a745'; // Green for fast
-                } else if (responseTime < 300) {
-                    perfDot.style.background = '#ffc107'; // Yellow for medium
-                } else {
-                    perfDot.style.background = '#dc3545'; // Red for slow
-                }
-            }
         }
 
         // Utility functions
@@ -850,10 +829,11 @@
             window.location.href = window.location.pathname;
         }
 
-        // Enhanced event-driven update system with performance optimization
+        // Enhanced event-driven update system with better tracking page support
         let lastDataHash = '';
         let lastOrderCount = 0;
         let updateCheckInterval;
+        let lastTrackingOrderData = null;
         
         // Calculate a simple hash of the current data state
         function calculateDataHash(orders, recentOrders, kitchenStatus) {
@@ -885,6 +865,30 @@
                         
                         trackPerformance(startTime);
                         currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
+                    } else if (currentPage === 'tracking') {
+                        // Enhanced tracking page monitoring
+                        const trackingOrderId = getOrderIdFromUrl();
+                        const [ordersResp, recentResp, kitchenResp] = await Promise.all([
+                            fetch('/api/orders').then(r => r.json()),
+                            fetch('/api/orders?completed-orders=true').then(r => r.json()),
+                            fetch('/api/orders?kitchen-status=true').then(r => r.json())
+                        ]);
+                        
+                        trackPerformance(startTime);
+                        
+                        // Check if the specific order being tracked has changed
+                        const currentOrder = ordersResp.find(o => o.id === trackingOrderId) || 
+                                           recentResp.find(o => o.id === trackingOrderId);
+                        
+                        const currentOrderData = currentOrder ? `${currentOrder.id}-${currentOrder.status}-${currentOrder.timestamp}` : 'not-found';
+                        
+                        if (lastTrackingOrderData && currentOrderData !== lastTrackingOrderData) {
+                            debugLog(`[TRACKING UPDATE] Order ${trackingOrderId} changed, refreshing tracking page`);
+                            await loadOrderTracking();
+                        }
+                        
+                        lastTrackingOrderData = currentOrderData;
+                        currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
                     } else {
                         const [recentResp, kitchenResp] = await Promise.all([
                             fetch('/api/orders?completed-orders=true').then(r => r.json()),
@@ -915,7 +919,7 @@
                 } catch (error) {
                     debugLog('Update check error:', error.message);
                 }
-            }, getCurrentPage() === 'order' ? 10000 : 20000);
+            }, getCurrentPage() === 'order' ? 10000 : getCurrentPage() === 'tracking' ? 5000 : 20000); // 5 seconds for tracking page
         }
         
         function stopEventDrivenUpdates() {
@@ -960,7 +964,7 @@
             await loadRecentOrders();
         }
 
-        // Immediate update triggers with performance tracking
+        // Enhanced immediate update triggers with better tracking page support
         async function triggerUIUpdate(action, data = {}) {
             const currentPage = getCurrentPage();
             debugLog(`[TRIGGER] ${action} - updating UI immediately`);
@@ -976,10 +980,20 @@
                     }
                     await loadRecentOrders();
                     
+                    // ENHANCED: Immediately update tracking page if viewing the affected order
                     if (currentPage === 'tracking') {
                         const trackingOrderId = getOrderIdFromUrl();
                         if (trackingOrderId === data.orderId) {
+                            debugLog(`[TRIGGER] Immediately refreshing tracking page for order ${data.orderId}`);
                             await loadOrderTracking();
+                        }
+                    }
+                    
+                    // Update tracking data for the polling system
+                    if (data.orderId) {
+                        const trackingOrderId = getOrderIdFromUrl();
+                        if (trackingOrderId === data.orderId) {
+                            lastTrackingOrderData = `${data.orderId}-${data.newStatus}-${new Date().getTime()}`;
                         }
                     }
                     break;
@@ -1002,6 +1016,12 @@
                         await loadOrders();
                     }
                     await loadRecentOrders();
+                    
+                    // If tracking page is open, show that order was cleared
+                    if (currentPage === 'tracking') {
+                        debugLog(`[TRIGGER] Orders cleared, updating tracking page`);
+                        await loadOrderTracking();
+                    }
                     break;
                     
                 case 'ORDER_DELETED':
@@ -1010,9 +1030,11 @@
                     }
                     await loadRecentOrders();
                     
+                    // ENHANCED: Immediately update tracking page if viewing the deleted order
                     if (currentPage === 'tracking') {
                         const trackingOrderId = getOrderIdFromUrl();
                         if (trackingOrderId === data.orderId) {
+                            debugLog(`[TRIGGER] Order ${data.orderId} deleted, showing message on tracking page`);
                             const trackingOrderDetails = document.getElementById('trackingOrderDetails');
                             if (trackingOrderDetails) {
                                 trackingOrderDetails.innerHTML = `
@@ -1121,24 +1143,13 @@
             try {
                 debugLog(`[DELETE ORDER] Starting deletion for Order ${orderId}`);
                 
-                const authPassword = prompt('Enter manager password to delete this order:');
-                if (!authPassword) {
-                    debugLog('[DELETE ORDER] Authorization cancelled by user');
-                    return;
-                }
-                
-                const correctPassword = 'delete123';
-                if (authPassword !== correctPassword) {
-                    showMessage('error', 'Incorrect password. Order not deleted.');
-                    debugLog('[DELETE ORDER] Authorization failed - incorrect password');
-                    return;
-                }
-                
+                // Double confirmation
                 if (!confirm(`Are you sure you want to permanently delete Order #${orderId}? This action cannot be undone.`)) {
                     debugLog('[DELETE ORDER] Deletion cancelled by user confirmation');
                     return;
                 }
                 
+                // Disable all buttons temporarily
                 const buttons = document.querySelectorAll('.status-btn, .delete-btn');
                 buttons.forEach(btn => {
                     btn.disabled = true;
@@ -1160,6 +1171,7 @@
                 debugLog('[DELETE ORDER] Error:', error);
                 showMessage('error', 'Failed to delete order: ' + error.message);
                 
+                // Re-enable buttons on error
                 const buttons = document.querySelectorAll('.status-btn, .delete-btn');
                 buttons.forEach(btn => {
                     btn.disabled = false;
@@ -1374,6 +1386,28 @@
         }
 
         function showPage(pageName) {
+            // Password protection for manager portal
+            if (pageName === 'manager') {
+                const authPassword = prompt('Enter manager password to access the portal:');
+                if (!authPassword) {
+                    debugLog('[MANAGER ACCESS] Access cancelled by user');
+                    // Redirect to main page
+                    window.location.href = window.location.pathname;
+                    return;
+                }
+                
+                const correctPassword = 'manager123'; // Change this to your preferred password
+                if (authPassword !== correctPassword) {
+                    showMessage('error', 'Incorrect password. Access denied.');
+                    debugLog('[MANAGER ACCESS] Access failed - incorrect password');
+                    // Redirect to main page
+                    window.location.href = window.location.pathname;
+                    return;
+                }
+                
+                debugLog('[MANAGER ACCESS] Access granted');
+            }
+            
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
             });
@@ -1575,19 +1609,22 @@
         }
 
         async function clearAllOrders() {
-            if (confirm('Are you sure you want to clear all orders?')) {
-                try {
-                    await clearOrders();
-                    showMessage('success', 'All orders cleared');
-                    
-                    await triggerUIUpdate('ORDERS_CLEARED');
-                    
-                    debugLog(`[CLEAR ORDERS] All orders cleared and UI updated`);
-                    
-                } catch (error) {
-                    console.error('Clear orders error:', error.message);
-                    showMessage('error', 'Failed to clear orders. Please try again.');
-                }
+            // Double confirmation
+            if (!confirm('Are you sure you want to clear ALL orders? This will move all active orders to completed status.')) {
+                return;
+            }
+            
+            try {
+                await clearOrders();
+                showMessage('success', 'All orders cleared');
+                
+                await triggerUIUpdate('ORDERS_CLEARED');
+                
+                debugLog(`[CLEAR ORDERS] All orders cleared and UI updated`);
+                
+            } catch (error) {
+                console.error('Clear orders error:', error.message);
+                showMessage('error', 'Failed to clear orders. Please try again.');
             }
         }
 
@@ -1709,6 +1746,7 @@
             
             lastOrderCount = 0;
             lastDataHash = '';
+            lastTrackingOrderData = null; // Reset tracking data
             
             showPage(currentPage);
             
