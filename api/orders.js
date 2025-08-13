@@ -1,4 +1,44 @@
-// api/orders.js - Workaround version using query parameters
+// Handle delete order using query parameter
+    if (searchParams.has('delete-order')) {
+      console.log('[API] Delete order route');
+      
+      if (method === 'DELETE') {
+        try {
+          const data = await getCurrentData();
+          
+          const orderId = searchParams.get('delete-order');
+          console.log(`[API] Delete request for order ${orderId}`);
+          
+          const orderIndex = data.orders.findIndex(order => order.id === orderId);
+          
+          if (orderIndex === -1) {
+            console.log(`[API] Order ${orderId} not found in active orders`);
+            return res.status(404).json({ error: 'Order not found' });
+          }
+          
+          // Remove the order completely (no trace)
+          const deletedOrder = data.orders[orderIndex];
+          data.orders.splice(orderIndex, 1);
+          
+          await saveData(data);
+          
+          console.log(`[API] Order ${orderId} deleted permanently`);
+          return res.status(200).json({
+            success: true,
+            message: 'Order deleted permanently',
+            deletedOrder: {
+              id: deletedOrder.id,
+              food: deletedOrder.food,
+              customer: deletedOrder.name
+            }
+          });
+          
+        } catch (err) {
+          console.error('[API] Failed to delete order:', err.message);
+          return res.status(500).json({ error: "Failed to delete order: " + err.message });
+        }
+      }
+    }// api/orders.js - Workaround version using query parameters
 export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -281,6 +321,48 @@ export default async function handler(req, res) {
         } catch (err) {
           console.error('[API] Failed to update order:', err.message);
           return res.status(500).json({ error: "Failed to update order: " + err.message });
+        }
+      }
+    }
+
+    // Handle delete order using query parameter
+    if (searchParams.has('delete-order')) {
+      console.log('[API] Delete order route');
+      
+      if (method === 'DELETE') {
+        try {
+          const data = await getCurrentData();
+          
+          const orderId = searchParams.get('delete-order');
+          console.log(`[API] Delete request for order ${orderId}`);
+          
+          const orderIndex = data.orders.findIndex(order => order.id === orderId);
+          
+          if (orderIndex === -1) {
+            console.log(`[API] Order ${orderId} not found in active orders`);
+            return res.status(404).json({ error: 'Order not found' });
+          }
+          
+          // Remove the order completely (no trace)
+          const deletedOrder = data.orders[orderIndex];
+          data.orders.splice(orderIndex, 1);
+          
+          await saveData(data);
+          
+          console.log(`[API] Order ${orderId} deleted permanently`);
+          return res.status(200).json({
+            success: true,
+            message: 'Order deleted permanently',
+            deletedOrder: {
+              id: deletedOrder.id,
+              food: deletedOrder.food,
+              customer: deletedOrder.name
+            }
+          });
+          
+        } catch (err) {
+          console.error('[API] Failed to delete order:', err.message);
+          return res.status(500).json({ error: "Failed to delete order: " + err.message });
         }
       }
     }

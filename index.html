@@ -251,6 +251,34 @@
             transform: none;
         }
 
+        .delete-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            background: rgba(220, 53, 69, 0.8);
+            color: white;
+            border: 1px solid rgba(220, 53, 69, 0.9);
+            position: relative;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .delete-btn:hover {
+            background: rgba(220, 53, 69, 1);
+            transform: scale(1.05);
+        }
+
+        .delete-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .no-orders {
             text-align: center;
             color: #666;
@@ -692,7 +720,184 @@
             window.location.href = window.location.pathname;
         }
 
-        // FIXED API FUNCTIONS - Clean and optimized
+        // Event-driven update system - no more constant polling!
+        let lastDataHash = '';
+        let lastOrderCount = 0;
+        let updateCheckInterval;
+        
+        // Calculate a simple hash of the current data state
+        function calculateDataHash(orders, recentOrders, kitchenStatus) {
+            const dataString = JSON.stringify({
+                orders: orders.map(o => `${o.id}-${o.status}`),
+                recentCount: recentOrders.length,
+                kitchen: kitchenStatus
+            });
+            return btoa(dataString).slice(0, 16); // Simple hash
+        }
+        
+        // Lightweight check for data changes (only when user is active)
+        function startEventDrivenUpdates() {
+            // Much less frequent check - only to detect external changes
+            updateCheckInterval = setInterval(async () => {
+                // Only check if tab is visible and user is active
+                if (document.hidden) return;
+                
+                try {
+                    const currentPage = getCurrentPage();
+                    let currentHash = '';
+                    
+                    if (currentPage === 'manager') {
+                        // Quick check for managers
+                        const [ordersResp, recentResp, kitchenResp] = await Promise.all([
+                            fetch('/api/orders').then(r => r.json()),
+                            fetch('/api/orders?completed-orders=true').then(r => r.json()),
+                            fetch('/api/orders?kitchen-status=true').then(r => r.json())
+                        ]);
+                        
+                        currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
+                    } else {
+                        // Lighter check for customers
+                        const [recentResp, kitchenResp] = await Promise.all([
+                            fetch('/api/orders?completed-orders=true').then(r => r.json()),
+                            fetch('/api/orders?kitchen-status=true').then(r => r.json())
+                        ]);
+                        
+                        currentHash = calculateDataHash([], recentResp, kitchenResp.isOpen);
+                    }
+                    
+                    // Only update if data actually changed
+                    if (currentHash !== lastDataHash && lastDataHash !== '') {
+                        console.error(`[EVENT UPDATE] Data changed, triggering refresh`);
+                        await handleDataChange(currentPage);
+                    }
+                    
+                    lastDataHash = currentHash;
+                    
+                } catch (error) {
+                    // Silent fail - don't spam console
+                    debugLog('Update check error:', error.message);
+                }
+            }, 15000); // Only check every 15 seconds for external changes
+        }
+        
+        function stopEventDrivenUpdates() {
+            if (updateCheckInterval) {
+                clearInterval(updateCheckInterval);
+                updateCheckInterval = null;
+            }
+        }
+        
+        // Handle data changes based on user type
+        async function handleDataChange(currentPage) {
+            if (currentPage === 'manager') {
+                const [ordersResp, kitchenResp] = await Promise.all([
+                    getOrders(),
+                    getKitchenStatus()
+                ]);
+                
+                // Check for new orders
+                const newOrderCount = ordersResp.orders?.length || 0;
+                if (newOrderCount > lastOrderCount) {
+                    showNewOrderNotification();
+                }
+                lastOrderCount = newOrderCount;
+                
+                // Check kitchen status change
+                if (kitchenResp.isOpen !== kitchenOpen) {
+                    kitchenOpen = kitchenResp.isOpen;
+                    updateKitchenButton();
+                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'} by another manager`, 3000);
+                }
+                
+                await loadOrders();
+            } else if (currentPage === 'order') {
+                const kitchenResp = await getKitchenStatus();
+                if (kitchenResp.isOpen !== kitchenOpen) {
+                    kitchenOpen = kitchenResp.isOpen;
+                    updateOrderPageDisplay();
+                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 3000);
+                }
+            } else if (currentPage === 'tracking') {
+                await loadOrderTracking();
+            }
+            
+            // Always update sidebar for everyone
+            await loadRecentOrders();
+        }
+
+        // Immediate update triggers - only update when actions happen
+        async function triggerUIUpdate(action, data = {}) {
+            const currentPage = getCurrentPage();
+            console.error(`[TRIGGER] ${action} - updating UI immediately`);
+            
+            switch (action) {
+                case 'ORDER_PLACED':
+                    // Only update sidebar for everyone
+                    await loadRecentOrders();
+                    break;
+                    
+                case 'ORDER_STATUS_UPDATED':
+                    // Update manager view and sidebar
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    
+                    // Update tracking page if it's the same order
+                    if (currentPage === 'tracking') {
+                        const trackingOrderId = getOrderIdFromUrl();
+                        if (trackingOrderId === data.orderId) {
+                            await loadOrderTracking();
+                        }
+                    }
+                    break;
+                    
+                case 'KITCHEN_STATUS_CHANGED':
+                    // Update kitchen display for everyone
+                    if (currentPage === 'manager') {
+                        updateKitchenButton();
+                    } else if (currentPage === 'order') {
+                        updateOrderPageDisplay();
+                    }
+                    
+                    // Show notification to affected users
+                    showMessage('info', `Kitchen ${data.isOpen ? 'opened' : 'closed'}`, 3000);
+                    break;
+                    
+                case 'ORDERS_CLEARED':
+                    // Full refresh for managers only
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    break;
+                    
+                case 'ORDER_DELETED':
+                    // Update manager view and sidebar
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    
+                    // If tracking page is showing the deleted order, show error
+                    if (currentPage === 'tracking') {
+                        const trackingOrderId = getOrderIdFromUrl();
+                        if (trackingOrderId === data.orderId) {
+                            const trackingOrderDetails = document.getElementById('trackingOrderDetails');
+                            if (trackingOrderDetails) {
+                                trackingOrderDetails.innerHTML = `
+                                    <div class="error-message" style="display: block;">
+                                        This order has been deleted by a manager.
+                                    </div>
+                                `;
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // API FUNCTIONS
         async function getOrders() {
             try {
                 debugLog('Fetching orders from /api/orders');
@@ -776,6 +981,90 @@
             }
         }
 
+        async function deleteOrder(orderId) {
+            try {
+                console.error(`[DELETE ORDER] Starting deletion for Order ${orderId}`);
+                
+                // Authorization check
+                const authPassword = prompt('Enter manager password to delete this order:');
+                if (!authPassword) {
+                    console.error('[DELETE ORDER] Authorization cancelled by user');
+                    return;
+                }
+                
+                // Simple password check (you can enhance this)
+                const correctPassword = 'delete123'; // Change this to your preferred password
+                if (authPassword !== correctPassword) {
+                    showMessage('error', 'Incorrect password. Order not deleted.');
+                    console.error('[DELETE ORDER] Authorization failed - incorrect password');
+                    return;
+                }
+                
+                // Double confirmation
+                if (!confirm(`Are you sure you want to permanently delete Order #${orderId}? This action cannot be undone.`)) {
+                    console.error('[DELETE ORDER] Deletion cancelled by user confirmation');
+                    return;
+                }
+                
+                // Disable all buttons temporarily
+                const buttons = document.querySelectorAll('.status-btn, .delete-btn');
+                buttons.forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.classList.contains('delete-btn')) {
+                        btn.textContent = 'Deleting...';
+                    }
+                });
+                
+                const result = await deleteOrderFromAPI(orderId);
+                console.error(`[DELETE ORDER] Success:`, result);
+                
+                showMessage('success', `Order #${orderId} has been permanently deleted`);
+                
+                // Trigger targeted UI update
+                await triggerUIUpdate('ORDER_DELETED', { orderId });
+                
+                console.error(`[DELETE ORDER] UI updated after deletion`);
+                
+            } catch (error) {
+                console.error('[DELETE ORDER] Error:', error);
+                showMessage('error', 'Failed to delete order: ' + error.message);
+                
+                // Re-enable buttons on error
+                const buttons = document.querySelectorAll('.status-btn, .delete-btn');
+                buttons.forEach(btn => {
+                    btn.disabled = false;
+                    if (btn.classList.contains('delete-btn')) {
+                        btn.textContent = 'Delete';
+                    }
+                });
+            }
+        }
+
+        async function deleteOrderFromAPI(orderId) {
+            try {
+                console.error(`[API CALL] DELETE /api/orders?delete-order=${orderId}`);
+                const response = await fetch(`/api/orders?delete-order=${orderId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[API CALL] Error Response:`, response.status, errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                console.error(`[API CALL] Delete Success Response:`, result);
+                return result;
+            } catch (error) {
+                console.error('[API CALL] Delete Exception:', error);
+                throw error;
+            }
+        }
+
         async function clearOrders() {
             try {
                 debugLog('Clearing all orders');
@@ -851,13 +1140,22 @@
 
         async function toggleKitchenStatus() {
             try {
+                const previousStatus = kitchenOpen;
                 kitchenOpen = !kitchenOpen;
+                
                 await setKitchenStatus(kitchenOpen);
-                updateKitchenButton();
-                showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}`);
+                
+                // Trigger immediate UI update
+                await triggerUIUpdate('KITCHEN_STATUS_CHANGED', { isOpen: kitchenOpen });
+                
+                console.error(`[KITCHEN] Status changed from ${previousStatus} to ${kitchenOpen}`);
+                
             } catch (error) {
                 console.error('Failed to update kitchen status:', error.message);
+                // Revert on error
                 kitchenOpen = !kitchenOpen;
+                updateKitchenButton();
+                updateOrderPageDisplay();
                 showMessage('error', 'Failed to update kitchen status');
             }
         }
@@ -905,71 +1203,26 @@
             }
         }
 
-        // Optimized refresh system - reduced frequency and smarter updates
-        let lastOrderCount = 0;
-        let lastRecentOrdersCount = 0;
-        let refreshInterval;
-        
-        function startSmartRefresh() {
-            // Reduced frequency from 3s to 10s to prevent spam
-            refreshInterval = setInterval(async () => {
-                const currentPage = getCurrentPage();
-                
-                try {
-                    if (currentPage === 'manager') {
-                        // Check for new orders
-                        const response = await getOrders();
-                        const currentOrderCount = response.orders ? response.orders.length : 0;
-                        
-                        if (currentOrderCount !== lastOrderCount) {
-                            if (currentOrderCount > lastOrderCount) {
-                                showNewOrderNotification();
-                            }
-                            lastOrderCount = currentOrderCount;
-                            loadOrders();
-                        }
-                    }
-                    
-                    // Check recent orders less frequently for all pages
-                    const recentResponse = await getRecentOrders();
-                    const currentRecentCount = recentResponse.orders ? recentResponse.orders.length : 0;
-                    
-                    if (currentRecentCount !== lastRecentOrdersCount) {
-                        lastRecentOrdersCount = currentRecentCount;
-                        loadRecentOrders();
-                    }
-                    
-                    // Check kitchen status only for order page
-                    if (currentPage === 'order') {
-                        checkKitchenStatus();
-                    }
-                    
-                    // Update tracking page if needed
-                    if (currentPage === 'tracking') {
-                        loadOrderTracking();
-                    }
-                    
-                } catch (error) {
-                    // Silently handle refresh errors to prevent spam
-                    debugLog('Refresh error:', error.message);
-                }
-            }, 10000); // Changed from 3000ms to 10000ms (10 seconds)
-        }
-
-        function stopSmartRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-
         function showNewOrderNotification() {
             const notification = document.getElementById('newOrderNotification');
             if (notification) {
                 notification.style.display = 'block';
+                
+                // Enhanced notification with sound and longer display
+                try {
+                    // Play notification sound
+                    new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhDjWCyPPPfTIGHm7A7+OZSA0NVqzn77NdGAg+ltryxnkpBSl+zPLaizsIGGS57OOYTgwOUarm7bliFg06kdDzyn0vBSF0xe/glEILElyx6OyrWBUIQ5zd8sFuIAU2jdXzzn1uBiJ0xe/glEILElyx6OyrWBUIQ5zd8sFuIAU2jdXzzn1uBg==').play().catch(() => {});
+                } catch (e) {
+                    // Silent fail for browsers that don't support audio
+                }
+                
+                // Make notification more prominent with pulsing
+                notification.style.animation = 'pulse 0.5s infinite';
+                
                 setTimeout(() => {
                     notification.style.display = 'none';
-                }, 3000);
+                    notification.style.animation = '';
+                }, 5000); // Show for 5 seconds instead of 3
             }
         }
 
@@ -984,19 +1237,19 @@
                 loadOrders();
                 checkKitchenStatus();
                 loadRecentOrders();
-                startSmartRefresh();
+                startEventDrivenUpdates();
             } else if (pageName === 'tracking') {
                 document.getElementById('trackingPage').classList.add('active');
                 document.getElementById('headerSubtitle').textContent = 'Track your order';
                 loadOrderTracking();
                 loadRecentOrders();
-                startSmartRefresh();
+                startEventDrivenUpdates();
             } else {
                 document.getElementById('orderPage').classList.add('active');
                 document.getElementById('headerSubtitle').textContent = 'Place your order';
                 checkKitchenStatus();
                 loadRecentOrders();
-                startSmartRefresh();
+                startEventDrivenUpdates();
             }
         }
 
@@ -1020,9 +1273,17 @@
                 const response = await addOrder(order);
                 this.reset();
                 
+                console.error(`[NEW ORDER] Order placed successfully: ${response.order?.id}`);
+                
+                // Trigger immediate UI update for the sidebar only
+                await triggerUIUpdate('ORDER_PLACED', { orderId: response.order?.id });
+                
                 // Redirect to tracking page with the returned order ID
                 if (response.order && response.order.id) {
-                    window.location.href = `?id=${response.order.id}`;
+                    // Small delay to ensure the order appears in the system
+                    setTimeout(() => {
+                        window.location.href = `?id=${response.order.id}`;
+                    }, 500);
                 } else {
                     showMessage('success', 'Order placed successfully!');
                 }
@@ -1060,7 +1321,7 @@
                     if (noOrdersMsg) noOrdersMsg.style.display = 'block';
                 } else if (container) {
                     container.innerHTML = orders.map((order) => `
-                        <div class="order-card">
+                        <div class="order-card" data-order-id="${order.id}">
                             <h3>Order #${order.id}</h3>
                             <div class="order-info">
                                 <strong>Food:</strong> ${order.food}<br>
@@ -1072,20 +1333,63 @@
                             </div>
                             <div class="status-controls">
                                 ${order.status === 'pending' ? `
-                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'accepted')">Accept</button>
+                                    <button class="status-btn" data-order-id="${order.id}" data-status="accepted" type="button">Accept</button>
+                                    <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
                                 ` : ''}
                                 ${order.status === 'accepted' ? `
-                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'being-made')">Start Making</button>
+                                    <button class="status-btn" data-order-id="${order.id}" data-status="being-made" type="button">Start Making</button>
+                                    <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
                                 ` : ''}
                                 ${order.status === 'being-made' ? `
-                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'being-delivered')">Out for Delivery</button>
+                                    <button class="status-btn" data-order-id="${order.id}" data-status="being-delivered" type="button">Out for Delivery</button>
+                                    <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
                                 ` : ''}
                                 ${order.status === 'being-delivered' ? `
-                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'completed')">Complete</button>
+                                    <button class="status-btn" data-order-id="${order.id}" data-status="completed" type="button">Complete</button>
+                                    <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
                                 ` : ''}
                             </div>
                         </div>
                     `).join('');
+                    
+                    // Add event listeners to buttons after creating them
+                    const statusButtons = container.querySelectorAll('.status-btn');
+                    statusButtons.forEach(button => {
+                        button.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            const orderId = this.getAttribute('data-order-id');
+                            const newStatus = this.getAttribute('data-status');
+                            
+                            console.error(`[Button Click] Order: ${orderId}, New Status: ${newStatus}`);
+                            
+                            if (orderId && newStatus) {
+                                updateStatus(orderId, newStatus);
+                            } else {
+                                console.error('[Button Click] Missing orderId or newStatus', { orderId, newStatus });
+                            }
+                        });
+                    });
+
+                    // Add event listeners to delete buttons
+                    const deleteButtons = container.querySelectorAll('.delete-btn');
+                    deleteButtons.forEach(button => {
+                        button.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            const orderId = this.getAttribute('data-order-id');
+                            
+                            console.error(`[Delete Button Click] Order: ${orderId}`);
+                            
+                            if (orderId) {
+                                deleteOrder(orderId);
+                            } else {
+                                console.error('[Delete Button Click] Missing orderId', { orderId });
+                            }
+                        });
+                    });
                 }
             } catch (error) {
                 console.error('Load orders error:', error.message);
@@ -1110,9 +1414,10 @@
                 
                 showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
                 
-                // Reload orders immediately
-                await loadOrders();
-                await loadRecentOrders();
+                // Trigger targeted UI update
+                await triggerUIUpdate('ORDER_STATUS_UPDATED', { orderId, newStatus });
+                
+                console.error(`[UPDATE STATUS] UI updated for affected views`);
                 
             } catch (error) {
                 console.error('[UPDATE STATUS] Error:', error);
@@ -1139,8 +1444,12 @@
                 try {
                     await clearOrders();
                     showMessage('success', 'All orders cleared');
-                    loadOrders();
-                    loadRecentOrders();
+                    
+                    // Trigger targeted UI update
+                    await triggerUIUpdate('ORDERS_CLEARED');
+                    
+                    console.error(`[CLEAR ORDERS] All orders cleared and UI updated`);
+                    
                 } catch (error) {
                     console.error('Clear orders error:', error.message);
                     showMessage('error', 'Failed to clear orders. Please try again.');
@@ -1263,11 +1572,18 @@
         // Initialize
         function init() {
             const currentPage = getCurrentPage();
+            
+            // Initialize tracking variables
+            lastOrderCount = 0;
+            lastDataHash = '';
+            
             showPage(currentPage);
+            
+            console.error(`[INIT] Application initialized on ${currentPage} page with event-driven updates`);
         }
 
         // Clean up intervals when page unloads
-        window.addEventListener('beforeunload', stopSmartRefresh);
+        window.addEventListener('beforeunload', stopEventDrivenUpdates);
         window.addEventListener('popstate', init);
         document.addEventListener('DOMContentLoaded', init);
         
