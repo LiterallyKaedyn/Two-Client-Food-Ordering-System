@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Debug Test</title>
+</head>
+<body>
+    <h1>API Debug Test</h1>
+    <button onclick="testAPI()">Test API Endpoints</button>
+    <pre id="results"></pre>
+
+    <script>
+        async function testAPI() {
+            const results = document.getElementById('results');
+            results.innerHTML = 'Testing API endpoints...\n\n';
+            
+            const tests = [
+                { name: 'GET /api/orders', method: 'GET', url: '/api/orders' },
+                { name: 'PUT /api/orders/002', method: 'PUT', url: '/api/orders/002', body: { status: 'accepted' } },
+                { name: 'GET kitchen status', method: 'GET', url: '/api/orders?kitchen-status=true' },
+                { name: 'GET completed orders', method: 'GET', url: '/api/orders?completed-orders=true' }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    results.innerHTML += `Testing ${test.name}...\n`;
+                    
+                    const options = {
+                        method: test.method,
+                        headers: { 'Content-Type': 'application/json' }
+                    };
+                    
+                    if (test.body) {
+                        options.body = JSON.stringify(test.body);
+                    }
+                    
+                    const response = await fetch(test.url, options);
+                    const text = await response.text();
+                    
+                    results.innerHTML += `  Status: ${response.status}\n`;
+                    results.innerHTML += `  Response: ${text.substring(0, 200)}...\n\n`;
+                } catch (error) {
+                    results.innerHTML += `  Error: ${error.message}\n\n`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

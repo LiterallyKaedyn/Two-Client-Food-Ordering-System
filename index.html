@@ -752,8 +752,8 @@
                     updateData.completedAt = getNZTime();
                 }
 
-                console.error(`[API CALL] PUT /api/orders/${id} with status: ${status}`);
-                const response = await fetch(`/api/orders/${id}`, {
+                console.error(`[API CALL] PUT /api/orders?update-order=${id} with status: ${status}`);
+                const response = await fetch(`/api/orders?update-order=${id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
