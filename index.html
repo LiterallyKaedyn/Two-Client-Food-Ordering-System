@@ -629,6 +629,15 @@
     <a href="?page=manager" class="manager-access" id="managerAccess">Manager</a>
 
     <script>
+        // Debug mode - set to false to reduce console spam
+        const DEBUG_MODE = false;
+        
+        function debugLog(...args) {
+            if (DEBUG_MODE) {
+                console.log(...args);
+            }
+        }
+
         // Utility functions
         function getNZTime() {
             return new Date().toLocaleString('en-NZ', {
@@ -672,24 +681,24 @@
             window.location.href = window.location.pathname;
         }
 
-        // FIXED API FUNCTIONS - Updated URLs to match backend routes
+        // FIXED API FUNCTIONS - Clean and optimized
         async function getOrders() {
             try {
-                console.log('Fetching orders from /api/orders');
+                debugLog('Fetching orders from /api/orders');
                 const response = await fetch('/api/orders');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const orders = await response.json();
-                console.log('Orders received:', orders);
+                debugLog('Orders received:', orders.length, 'orders');
                 return { orders: Array.isArray(orders) ? orders : [] };
             } catch (error) {
-                console.error('Failed to get orders:', error);
+                console.error('Failed to get orders:', error.message);
                 throw error;
             }
         }
 
         async function addOrder(order) {
             try {
-                console.log('Adding order:', order);
+                debugLog('Adding order:', order.food, 'for', order.name);
 
                 const response = await fetch('/api/orders', {
                     method: 'POST',
@@ -701,16 +710,15 @@
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('API Error Response:', errorText);
                     throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const result = await response.json();
-                console.log('Order added successfully:', result);
+                debugLog('Order added successfully:', result.order?.id);
                 
                 return result;
             } catch (error) {
-                console.error('Failed to add order:', error);
+                console.error('Failed to add order:', error.message);
                 throw error;
             }
         }
@@ -721,7 +729,7 @@
                 const order = response.orders.find(o => o.id === id);
                 return { order };
             } catch (error) {
-                console.error('Failed to get order:', error);
+                console.error('Failed to get order:', error.message);
                 throw error;
             }
         }
@@ -733,7 +741,7 @@
                     updateData.completedAt = getNZTime();
                 }
 
-                console.log(`Updating order ${id} to status ${status}`);
+                debugLog(`Updating order ${id} to status ${status}`);
                 const response = await fetch(`/api/orders/${id}`, {
                     method: 'PUT',
                     headers: {
@@ -745,17 +753,17 @@
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const result = await response.json();
-                console.log('Order status updated:', result);
+                debugLog('Order status updated successfully');
                 return result;
             } catch (error) {
-                console.error('Failed to update order:', error);
+                console.error('Failed to update order:', error.message);
                 throw error;
             }
         }
 
         async function clearOrders() {
             try {
-                console.log('Clearing all orders');
+                debugLog('Clearing all orders');
                 const response = await fetch('/api/orders', {
                     method: 'POST',
                     headers: {
@@ -766,62 +774,59 @@
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result = await response.json();
-                console.log('Orders cleared:', result);
+                debugLog('Orders cleared successfully');
                 return result;
             } catch (error) {
-                console.error('Failed to clear orders:', error);
+                console.error('Failed to clear orders:', error.message);
                 throw error;
             }
         }
 
         async function getKitchenStatus() {
             try {
-                console.log('Fetching kitchen status from /api/orders (kitchen-status)');
-                // The backend checks for 'kitchen-status' in the URL
+                debugLog('Fetching kitchen status');
                 const response = await fetch('/api/orders?kitchen-status=true');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const status = await response.json();
-                console.log('Kitchen status received:', status);
+                debugLog('Kitchen status:', status.isOpen ? 'Open' : 'Closed');
                 return status;
             } catch (error) {
-                console.error('Failed to get kitchen status:', error);
+                console.error('Failed to get kitchen status:', error.message);
                 return { isOpen: false };
             }
         }
 
         async function setKitchenStatus(isOpen) {
             try {
-                console.log('Setting kitchen status to:', isOpen);
-                // The backend checks for 'kitchen-status' in the URL
+                debugLog('Setting kitchen status to:', isOpen ? 'Open' : 'Closed');
                 const response = await fetch('/api/orders?kitchen-status=true', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ isOpen, lastUpdated: getNZTime() })
+                    body: JSON.stringify({ isOpen })
                 });
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result = await response.json();
-                console.log('Kitchen status updated:', result);
+                debugLog('Kitchen status updated successfully');
                 return result;
             } catch (error) {
-                console.error('Failed to set kitchen status:', error);
+                console.error('Failed to set kitchen status:', error.message);
                 throw error;
             }
         }
 
         async function getRecentOrders() {
             try {
-                console.log('Fetching recent orders from /api/orders (completed-orders)');
-                // The backend checks for 'completed-orders' in the URL
+                debugLog('Fetching recent orders');
                 const response = await fetch('/api/orders?completed-orders=true');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const orders = await response.json();
-                console.log('Recent orders received:', orders);
+                debugLog('Recent orders received:', orders.length, 'orders');
                 return { orders: Array.isArray(orders) ? orders : [] };
             } catch (error) {
-                console.error('Failed to get recent orders:', error);
+                console.error('Failed to get recent orders:', error.message);
                 return { orders: [] };
             }
         }
@@ -836,7 +841,7 @@
                 updateKitchenButton();
                 showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}`);
             } catch (error) {
-                console.error('Failed to update kitchen status:', error);
+                console.error('Failed to update kitchen status:', error.message);
                 kitchenOpen = !kitchenOpen;
                 showMessage('error', 'Failed to update kitchen status');
             }
@@ -864,7 +869,7 @@
                     updateKitchenButton();
                 }
             } catch (error) {
-                console.error('Failed to check kitchen status:', error);
+                console.error('Failed to check kitchen status:', error.message);
                 kitchenOpen = false;
                 updateOrderPageDisplay();
             }
@@ -885,14 +890,19 @@
             }
         }
 
-        // Smart refresh system
+        // Optimized refresh system - reduced frequency and smarter updates
         let lastOrderCount = 0;
+        let lastRecentOrdersCount = 0;
         let refreshInterval;
         
         function startSmartRefresh() {
+            // Reduced frequency from 3s to 10s to prevent spam
             refreshInterval = setInterval(async () => {
-                if (getCurrentPage() === 'manager') {
-                    try {
+                const currentPage = getCurrentPage();
+                
+                try {
+                    if (currentPage === 'manager') {
+                        // Check for new orders
                         const response = await getOrders();
                         const currentOrderCount = response.orders ? response.orders.length : 0;
                         
@@ -903,18 +913,32 @@
                             lastOrderCount = currentOrderCount;
                             loadOrders();
                         }
-                        loadRecentOrders();
-                    } catch (error) {
-                        console.error('Failed to check for new orders:', error);
                     }
-                } else if (getCurrentPage() === 'order') {
-                    checkKitchenStatus();
-                    loadRecentOrders();
-                } else if (getCurrentPage() === 'tracking') {
-                    loadOrderTracking();
-                    loadRecentOrders();
+                    
+                    // Check recent orders less frequently for all pages
+                    const recentResponse = await getRecentOrders();
+                    const currentRecentCount = recentResponse.orders ? recentResponse.orders.length : 0;
+                    
+                    if (currentRecentCount !== lastRecentOrdersCount) {
+                        lastRecentOrdersCount = currentRecentCount;
+                        loadRecentOrders();
+                    }
+                    
+                    // Check kitchen status only for order page
+                    if (currentPage === 'order') {
+                        checkKitchenStatus();
+                    }
+                    
+                    // Update tracking page if needed
+                    if (currentPage === 'tracking') {
+                        loadOrderTracking();
+                    }
+                    
+                } catch (error) {
+                    // Silently handle refresh errors to prevent spam
+                    debugLog('Refresh error:', error.message);
                 }
-            }, 3000);
+            }, 10000); // Changed from 3000ms to 10000ms (10 seconds)
         }
 
         function stopSmartRefresh() {
@@ -989,7 +1013,7 @@
                 }
                 
             } catch (error) {
-                console.error('Order submission error:', error);
+                console.error('Order submission error:', error.message);
                 const errorMessage = error.message?.includes('HTTP 500') 
                     ? 'Server error. Please check your API configuration and try again.' 
                     : 'Failed to place order. Please try again.';
@@ -1049,7 +1073,7 @@
                     `).join('');
                 }
             } catch (error) {
-                console.error('Load orders error:', error);
+                console.error('Load orders error:', error.message);
                 if (loading) loading.style.display = 'none';
                 if (container) container.innerHTML = '<div class="error-message" style="display: block;">Failed to load orders. Please refresh.</div>';
             }
@@ -1062,7 +1086,7 @@
                 loadOrders();
                 loadRecentOrders();
             } catch (error) {
-                console.error('Update status error:', error);
+                console.error('Update status error:', error.message);
                 showMessage('error', 'Failed to update order status. Please try again.');
             }
         }
@@ -1075,7 +1099,7 @@
                     loadOrders();
                     loadRecentOrders();
                 } catch (error) {
-                    console.error('Clear orders error:', error);
+                    console.error('Clear orders error:', error.message);
                     showMessage('error', 'Failed to clear orders. Please try again.');
                 }
             }
@@ -1121,7 +1145,7 @@
                 updateStatusTimeline(order.status);
 
             } catch (error) {
-                console.error('Load order tracking error:', error);
+                console.error('Load order tracking error:', error.message);
                 if (trackingOrderDetails) {
                     trackingOrderDetails.innerHTML = `
                         <div class="error-message" style="display: block;">
@@ -1174,7 +1198,7 @@
                         `).join('');
                 }
             } catch (error) {
-                console.error('Load recent orders error:', error);
+                console.error('Load recent orders error:', error.message);
                 recentContainer.innerHTML = '<p style="color: #dc3545;">Failed to load recent orders.</p>';
             }
         }
