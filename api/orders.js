@@ -352,3 +352,4 @@ export default async function handler(req, res) {
   // 404 for everything else
   console.log(`[API] No matching route for ${method} ${url}`);
   return res.status(404).json({ error: "Endpoint not found" });
+}
