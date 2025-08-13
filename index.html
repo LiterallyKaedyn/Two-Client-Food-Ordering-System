@@ -47,43 +47,6 @@
             opacity: 0.9;
         }
 
-        .nav-links {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin: 30px 0;
-        }
-
-        .nav-link {
-            padding: 15px 30px;
-            text-decoration: none;
-            border-radius: 50px;
-            font-size: 1.1em;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: inline-block;
-        }
-
-        .nav-link.active {
-            background: linear-gradient(135deg, #4ecdc4, #44a08d);
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(78, 205, 196, 0.3);
-        }
-
-        .nav-link:not(.active) {
-            background: #f8f9fa;
-            color: #666;
-            border: 2px solid #e9ecef;
-        }
-
-        .nav-link:not(.active):hover {
-            background: #e9ecef;
-            transform: translateY(-1px);
-        }
-
         .content {
             padding: 40px;
         }
@@ -307,17 +270,39 @@
             color: #666;
         }
 
+        /* Hide manager access from order page */
+        .manager-access {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 10px;
+            text-decoration: none;
+            display: none;
+        }
+
+        .new-order-notification {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
         @media (max-width: 600px) {
-            .nav-links {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .nav-link {
-                width: 200px;
-                text-align: center;
-            }
-
             .content {
                 padding: 20px;
             }
@@ -332,17 +317,12 @@
     <div class="container">
         <div class="header">
             <h1>🍔 Food Order System</h1>
-            <p id="headerSubtitle">Place your order or manage existing orders</p>
-        </div>
-
-        <div class="nav-links">
-            <a href="?page=order" class="nav-link" id="orderNavLink">Place Order</a>
-            <a href="?page=manager" class="nav-link" id="managerNavLink">Manage Orders</a>
+            <p id="headerSubtitle">Place your order</p>
         </div>
 
         <div class="content">
             <!-- Order Form Page -->
-            <div id="orderPage" class="page">
+            <div id="orderPage" class="page active">
                 <!-- Kitchen Closed Message -->
                 <div id="kitchenClosedMessage" class="kitchen-closed-message">
                     <h2>🔴 Kitchen Closed</h2>
@@ -378,6 +358,9 @@
 
             <!-- Manager Page -->
             <div id="managerPage" class="page">
+                <div class="new-order-notification" id="newOrderNotification">
+                    🔔 New order received!
+                </div>
                 <div class="manager-controls">
                     <button class="kitchen-status-btn" id="kitchenToggle" onclick="toggleKitchenStatus()">🔴 Kitchen Closed</button>
                     <button class="refresh-btn" onclick="loadOrders()">🔄 Refresh Orders</button>
@@ -392,6 +375,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Hidden manager access link -->
+    <a href="?page=manager" class="manager-access" id="managerAccess">Manager</a>
 
     <script>
         const API_BASE = '/api';
@@ -469,7 +455,7 @@
         }
 
         // Kitchen status management
-        let kitchenOpen = false; // Kitchen starts closed
+        let kitchenOpen = false;
 
         async function toggleKitchenStatus() {
             try {
@@ -478,7 +464,6 @@
                 updateKitchenButton();
             } catch (error) {
                 console.error('Failed to update kitchen status:', error);
-                // Revert the status if API call failed
                 kitchenOpen = !kitchenOpen;
             }
         }
@@ -504,7 +489,7 @@
                 }
             } catch (error) {
                 console.error('Failed to check kitchen status:', error);
-                kitchenOpen = false; // Default to closed if can't check
+                kitchenOpen = false;
                 updateOrderPageDisplay();
             }
         }
@@ -522,25 +507,50 @@
             }
         }
 
-        // Auto-refresh functionality for manager page AND kitchen status check for order page
-        let autoRefreshInterval;
+        // Smart refresh system - only refresh when there are changes
+        let lastOrderCount = 0;
+        let refreshInterval;
         
-        function startAutoRefresh() {
-            // Refresh every 3 seconds
-            autoRefreshInterval = setInterval(() => {
+        function startSmartRefresh() {
+            // Check for new orders every 5 seconds (less frequent than before)
+            refreshInterval = setInterval(async () => {
                 if (getCurrentPage() === 'manager') {
-                    loadOrders();
+                    try {
+                        const response = await getOrders();
+                        const currentOrderCount = response.orders ? response.orders.length : 0;
+                        
+                        // Only refresh display if order count changed
+                        if (currentOrderCount !== lastOrderCount) {
+                            if (currentOrderCount > lastOrderCount) {
+                                // New order detected - show notification
+                                showNewOrderNotification();
+                            }
+                            lastOrderCount = currentOrderCount;
+                            loadOrders();
+                        }
+                    } catch (error) {
+                        console.error('Failed to check for new orders:', error);
+                    }
                 } else if (getCurrentPage() === 'order') {
-                    checkKitchenStatus(); // Check if kitchen status changed
+                    // Only check kitchen status occasionally for order page
+                    checkKitchenStatus();
                 }
-            }, 3000);
+            }, 5000); // Check every 5 seconds instead of every 3
         }
 
-        function stopAutoRefresh() {
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-                autoRefreshInterval = null;
+        function stopSmartRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
             }
+        }
+
+        function showNewOrderNotification() {
+            const notification = document.getElementById('newOrderNotification');
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
         }
 
         function showPage(pageName) {
@@ -548,23 +558,17 @@
                 page.classList.remove('active');
             });
 
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('active');
-            });
-
             if (pageName === 'manager') {
                 document.getElementById('managerPage').classList.add('active');
-                document.getElementById('managerNavLink').classList.add('active');
                 document.getElementById('headerSubtitle').textContent = 'Manage and complete food orders';
                 loadOrders();
-                checkKitchenStatus(); // Update button status
-                startAutoRefresh();
+                checkKitchenStatus();
+                startSmartRefresh();
             } else {
                 document.getElementById('orderPage').classList.add('active');
-                document.getElementById('orderNavLink').classList.add('active');
                 document.getElementById('headerSubtitle').textContent = 'Place your food order';
-                checkKitchenStatus(); // Check if orders are allowed
-                startAutoRefresh(); // Start checking kitchen status
+                checkKitchenStatus();
+                startSmartRefresh();
             }
         }
 
@@ -611,6 +615,7 @@
                 const orders = response.orders || [];
                 
                 loading.style.display = 'none';
+                lastOrderCount = orders.length; // Update tracked count
                 
                 if (orders.length === 0) {
                     noOrdersMsg.style.display = 'block';
@@ -653,6 +658,20 @@
             }
         }
 
+        // Show manager access link only on triple-click of header
+        let clickCount = 0;
+        document.querySelector('.header').addEventListener('click', function() {
+            clickCount++;
+            if (clickCount === 3) {
+                document.getElementById('managerAccess').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('managerAccess').style.display = 'none';
+                    clickCount = 0;
+                }, 5000); // Hide after 5 seconds
+            }
+            setTimeout(() => { clickCount = 0; }, 1000); // Reset click count after 1 second
+        });
+
         // Initialize
         function init() {
             const currentPage = getCurrentPage();
@@ -660,7 +679,7 @@
         }
 
         // Clean up intervals when page unloads
-        window.addEventListener('beforeunload', stopAutoRefresh);
+        window.addEventListener('beforeunload', stopSmartRefresh);
         window.addEventListener('popstate', init);
         document.addEventListener('DOMContentLoaded', init);
     </script>
