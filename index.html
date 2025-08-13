@@ -532,8 +532,9 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🍔 Food Order System</h1>
-            <p id="headerSubtitle">Place your order</p>
+            <h1>Are You Hungry?</h1>
+            <p id="headerSubtitle">48 Hour Food Festival Catering</p>
+            <p>(48 Hour Film Festival 2025)</p>
         </div>
 
         <div class="main-layout">
@@ -542,9 +543,9 @@
                 <div id="orderPage" class="page active">
                     <!-- Kitchen Closed Message -->
                     <div id="kitchenClosedMessage" class="kitchen-closed-message" style="display: none;">
-                        <h2>🔴 Kitchen Closed</h2>
-                        <p>Nobody is available to complete your order at the moment.</p>
-                        <p>Please check back later when the kitchen reopens.</p>
+                        <h2>The Kitchen Is Closed!</h2>
+                        <p>We're sorry, nobody is available to complete your order at the moment.</p>
+                        <p>Please check back later.</p>
                     </div>
 
                     <!-- Order Form (hidden when kitchen closed) -->
@@ -557,37 +558,25 @@
                                 <label for="food">What food do you want:</label>
                                 <select id="food" name="food" required>
                                     <option value="">Select a food item...</option>
-                                    <option value="Pizza Margherita">Pizza Margherita</option>
-                                    <option value="Pizza Pepperoni">Pizza Pepperoni</option>
-                                    <option value="Pizza Hawaiian">Pizza Hawaiian</option>
-                                    <option value="Chicken Sandwich">Chicken Sandwich</option>
-                                    <option value="Turkey Sandwich">Turkey Sandwich</option>
-                                    <option value="BLT Sandwich">BLT Sandwich</option>
-                                    <option value="Caesar Salad">Caesar Salad</option>
-                                    <option value="Garden Salad">Garden Salad</option>
-                                    <option value="Chicken Caesar Salad">Chicken Caesar Salad</option>
-                                    <option value="Fish & Chips">Fish & Chips</option>
-                                    <option value="Chicken Wings">Chicken Wings</option>
-                                    <option value="Burger & Fries">Burger & Fries</option>
-                                    <option value="Pasta Marinara">Pasta Marinara</option>
-                                    <option value="Pasta Alfredo">Pasta Alfredo</option>
-                                    <option value="Spaghetti Bolognese">Spaghetti Bolognese</option>
+                                    <option value="Chicken Nuggets">Chicken Nuggets (Enter amount in comments)</option>
+                                    <option value="Chips">Hot Chips (V)(Enter scoops in comments)</option>
+                                    <option value="Quiche">Quiche</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
                                 <label for="comments">Special requests / Allergies (Optional):</label>
-                                <textarea id="comments" name="comments" placeholder="e.g., No onions, gluten-free, nut allergy, extra sauce, etc."></textarea>
+                                <textarea id="comments" name="comments" placeholder="e.g., No Onions, Gluten-Free, Nut Allergy, Extra Sauce, Vegan (For Echo), etc.."></textarea>
                             </div>
                             
                             <div class="form-group">
                                 <label for="room">What room are you in:</label>
-                                <input type="text" id="room" name="room" required placeholder="e.g., Room 101, Conference Room A...">
+                                <input type="text" id="room" name="room" required placeholder="e.g., RT1, Info Hub, etc..">
                             </div>
                             
                             <div class="form-group">
                                 <label for="name">What is your name:</label>
-                                <input type="text" id="name" name="name" required placeholder="Your full name">
+                                <input type="text" id="name" name="name" required placeholder="Your first name.">
                             </div>
                             
                             <button type="submit" class="submit-btn" id="submitBtn">Place Order</button>
@@ -601,11 +590,11 @@
                         🔔 New order received!
                     </div>
                     <div class="manager-controls">
-                        <button class="kitchen-status-btn" id="kitchenToggle" onclick="toggleKitchenStatus()">🔴 Kitchen Closed</button>
-                        <button class="refresh-btn" onclick="loadOrders()">🔄 Refresh Orders</button>
-                        <button class="clear-all-btn" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
+                        <button class="kitchen-status-btn" id="kitchenToggle" onclick="toggleKitchenStatus()">Open Kitchen</button>
+                        <button class="refresh-btn" onclick="loadOrders()">Refresh Active Order List</button>
+                        <button class="clear-all-btn" onclick="clearAllOrders()">Clear All Active Orders</button>
                     </div>
-                    <div class="loading" id="loading">Loading orders...</div>
+                    <div class="loading" id="loading">Loading active orders...</div>
                     <div id="ordersContainer" class="orders-container"></div>
                     <div id="noOrders" class="no-orders" style="display: none;">
                         No orders yet! 📝<br>
@@ -814,7 +803,7 @@
                 if (kitchenResp.isOpen !== kitchenOpen) {
                     kitchenOpen = kitchenResp.isOpen;
                     updateKitchenButton();
-                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'} by another manager`, 3000);
+                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'} by another manager`, 1000);
                 }
                 
                 await loadOrders();
@@ -823,7 +812,7 @@
                 if (kitchenResp.isOpen !== kitchenOpen) {
                     kitchenOpen = kitchenResp.isOpen;
                     updateOrderPageDisplay();
-                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 3000);
+                    showMessage('info', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 1000);
                 }
             } else if (currentPage === 'tracking') {
                 await loadOrderTracking();
@@ -871,7 +860,7 @@
                     }
                     
                     // Show notification to affected users
-                    showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 3000);
+                    showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 1000);
                     console.error(`[TRIGGER] Kitchen status updated to: ${data.isOpen}`);
                     break;
                     
@@ -1175,10 +1164,10 @@
             const button = document.getElementById('kitchenToggle');
             if (button) {
                 if (kitchenOpen) {
-                    button.textContent = '🟢 Kitchen Open';
+                    button.textContent = 'Close Kitchen';
                     button.classList.remove('closed');
                 } else {
-                    button.textContent = '🔴 Kitchen Closed';
+                    button.textContent = 'Open Kitchen';
                     button.classList.add('closed');
                 }
             }
@@ -1266,20 +1255,20 @@
 
             if (pageName === 'manager') {
                 document.getElementById('managerPage').classList.add('active');
-                document.getElementById('headerSubtitle').textContent = 'Manage and complete food orders';
+                document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Manage Active Orders';
                 loadOrders();
                 checkKitchenStatus();
                 loadRecentOrders();
                 startEventDrivenUpdates();
             } else if (pageName === 'tracking') {
                 document.getElementById('trackingPage').classList.add('active');
-                document.getElementById('headerSubtitle').textContent = 'Track your order';
+                document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Track Your Order';
                 loadOrderTracking();
                 loadRecentOrders();
                 startEventDrivenUpdates();
             } else {
                 document.getElementById('orderPage').classList.add('active');
-                document.getElementById('headerSubtitle').textContent = 'Place your order';
+                document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering';
                 checkKitchenStatus();
                 loadRecentOrders();
                 startEventDrivenUpdates();
