@@ -1081,13 +1081,25 @@
 
         async function updateStatus(orderId, newStatus) {
             try {
+                // Disable all buttons temporarily to prevent double-clicks
+                const buttons = document.querySelectorAll('.status-btn');
+                buttons.forEach(btn => btn.disabled = true);
+                
+                console.log(`Attempting to update order ${orderId} to ${newStatus}`);
                 await updateOrderStatus(orderId, newStatus);
                 showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
-                loadOrders();
-                loadRecentOrders();
+                
+                // Reload orders immediately
+                await loadOrders();
+                await loadRecentOrders();
+                
             } catch (error) {
-                console.error('Update status error:', error.message);
-                showMessage('error', 'Failed to update order status. Please try again.');
+                console.error('Update status error:', error);
+                showMessage('error', 'Failed to update order status: ' + error.message);
+                
+                // Re-enable buttons on error
+                const buttons = document.querySelectorAll('.status-btn');
+                buttons.forEach(btn => btn.disabled = false);
             }
         }
 

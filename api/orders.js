@@ -187,10 +187,77 @@ export default async function handler(req, res) {
   }
 
   // Handle main orders routes
-  if (url === '/api/orders' || (url.includes('/orders') && !url.includes('kitchen-status') && !url.includes('completed-orders'))) {
+  if (url === '/api/orders' || url.startsWith('/api/orders/')) {
+    
+    // PUT - Update specific order status (handle /api/orders/{id} pattern)
+    if (method === 'PUT' && url.includes('/api/orders/')) {
+      try {
+        const body = await parseBody(req);
+        const data = await getCurrentData();
+        
+        // Extract order ID from URL - handle both /api/orders/123 and /api/orders?id=123
+        let orderId;
+        if (url.includes('/api/orders/')) {
+          const urlParts = url.split('/');
+          orderId = urlParts[urlParts.length - 1];
+        }
+        
+        console.log(`[API] Updating order ${orderId} with status: ${body.status}`);
+        
+        const orderIndex = data.orders.findIndex(order => order.id === orderId);
+        
+        if (orderIndex === -1) {
+          console.log(`[API] Order ${orderId} not found in active orders`);
+          return res.status(404).json({ error: 'Order not found' });
+        }
+        
+        // Update order
+        data.orders[orderIndex] = { ...data.orders[orderIndex], ...body };
+        
+        // If order is completed, move it to completed orders
+        if (body.status === 'completed') {
+          const completedOrder = {
+            ...data.orders[orderIndex],
+            completedAt: new Date().toLocaleString('en-NZ', {
+              timeZone: 'Pacific/Auckland',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            })
+          };
+          
+          // Move to completed orders
+          data.completedOrders.push(completedOrder);
+          data.orders.splice(orderIndex, 1);
+          
+          // Keep only recent completed orders
+          if (data.completedOrders.length > 50) {
+            data.completedOrders = data.completedOrders.slice(-50);
+          }
+        }
+        
+        await saveData(data);
+        
+        console.log(`[API] Order ${orderId} updated successfully to status: ${body.status}`);
+        return res.status(200).json({
+          success: true,
+          message: 'Order updated',
+          order: body.status === 'completed' ? 
+            data.completedOrders[data.completedOrders.length - 1] : 
+            data.orders[orderIndex]
+        });
+        
+      } catch (err) {
+        console.error('[API] Failed to update order:', err.message);
+        return res.status(500).json({ error: "Failed to update order: " + err.message });
+      }
+    }
     
     // GET all orders (active orders only)
-    if (method === 'GET') {
+    if (method === 'GET' && url === '/api/orders') {
       try {
         const data = await getCurrentData();
         console.log(`[API] Returning ${data.orders.length} active orders`);
@@ -202,7 +269,7 @@ export default async function handler(req, res) {
     }
 
     // POST - Add new order or clear all orders
-    if (method === 'POST') {
+    if (method === 'POST' && url === '/api/orders') {
       try {
         const body = await parseBody(req);
         const data = await getCurrentData();
@@ -286,64 +353,6 @@ export default async function handler(req, res) {
           error: "Failed to process order", 
           details: err.message
         });
-      }
-    }
-
-    // PUT - Update specific order status
-    if (method === 'PUT') {
-      try {
-        const body = await parseBody(req);
-        const data = await getCurrentData();
-        
-        // Extract order ID from URL
-        const urlParts = url.split('/');
-        const orderId = urlParts[urlParts.length - 1];
-        
-        const orderIndex = data.orders.findIndex(order => order.id === orderId);
-        
-        if (orderIndex === -1) {
-          return res.status(404).json({ error: 'Order not found' });
-        }
-        
-        // Update order
-        data.orders[orderIndex] = { ...data.orders[orderIndex], ...body };
-        
-        // If order is completed, move it to completed orders
-        if (body.status === 'completed') {
-          const completedOrder = {
-            ...data.orders[orderIndex],
-            completedAt: new Date().toLocaleString('en-NZ', {
-              timeZone: 'Pacific/Auckland',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
-            })
-          };
-          
-          // Move to completed orders
-          data.completedOrders.push(completedOrder);
-          data.orders.splice(orderIndex, 1);
-          
-          // Keep only recent completed orders
-          if (data.completedOrders.length > 50) {
-            data.completedOrders = data.completedOrders.slice(-50);
-          }
-        }
-        
-        await saveData(data);
-        
-        console.log(`[API] Order ${orderId} updated to status: ${body.status}`);
-        return res.status(200).json({
-          success: true,
-          message: 'Order updated'
-        });
-        
-      } catch (err) {
-        console.error('[API] Failed to update order:', err.message);
-        return res.status(500).json({ error: "Failed to update order" });
       }
     }
   }
