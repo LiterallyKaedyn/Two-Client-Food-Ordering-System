@@ -1,46 +1,135 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>API Test - Kitchen Status Fix</title>
+    <title>🧪 Vercel KV Storage Test</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
-        .test-container { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .test-button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
-        .test-button:hover { background: #0056b3; }
-        .success { color: #28a745; }
-        .error { color: #dc3545; }
-        .result { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 10px; white-space: pre-wrap; font-family: monospace; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .test-container { 
+            background: rgba(255,255,255,0.1); 
+            padding: 25px; 
+            border-radius: 15px; 
+            margin-bottom: 20px; 
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .test-button { 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            padding: 12px 25px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin: 8px 5px; 
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .test-button:hover { 
+            background: #218838; 
+            transform: translateY(-2px);
+        }
+        .test-button.danger { background: #dc3545; }
+        .test-button.danger:hover { background: #c82333; }
+        .test-button.warning { background: #ffc107; color: #000; }
+        .test-button.warning:hover { background: #e0a800; }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #ff6b6b; font-weight: bold; }
+        .info { color: #17a2b8; font-weight: bold; }
+        .result { 
+            background: rgba(0,0,0,0.3); 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin-top: 15px; 
+            white-space: pre-wrap; 
+            font-family: 'Courier New', monospace; 
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { background: #28a745; }
+        .status-error { background: #dc3545; }
+        .status-warning { background: #ffc107; }
+        h1 { text-align: center; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        h2 { margin-bottom: 15px; }
     </style>
 </head>
 <body>
-    <h1>🔧 API Kitchen Status Fix Test</h1>
+    <h1>🧪 Vercel KV Storage Test</h1>
     
     <div class="test-container">
-        <h2>Kitchen Status Tests</h2>
-        <button class="test-button" onclick="testKitchenGet()">GET Kitchen Status</button>
-        <button class="test-button" onclick="testKitchenOpen()">POST Open Kitchen</button>
-        <button class="test-button" onclick="testKitchenClose()">POST Close Kitchen</button>
+        <h2>🏪 Kitchen Status Tests</h2>
+        <p>Test the kitchen open/close functionality that was causing 500 errors:</p>
+        <button class="test-button" onclick="testKitchenGet()">
+            📊 GET Kitchen Status
+        </button>
+        <button class="test-button warning" onclick="testKitchenOpen()">
+            🟢 Open Kitchen
+        </button>
+        <button class="test-button danger" onclick="testKitchenClose()">
+            🔴 Close Kitchen
+        </button>
         <div id="kitchen-results" class="result"></div>
     </div>
 
     <div class="test-container">
-        <h2>Order Tests</h2>
-        <button class="test-button" onclick="testGetOrders()">GET Orders</button>
-        <button class="test-button" onclick="testCreateOrder()">POST New Order</button>
-        <button class="test-button" onclick="testGetCompletedOrders()">GET Recent Orders</button>
+        <h2>📋 Order Management Tests</h2>
+        <p>Test the full order lifecycle:</p>
+        <button class="test-button" onclick="testGetOrders()">
+            📜 GET All Orders
+        </button>
+        <button class="test-button" onclick="testCreateOrder()">
+            ➕ Create Test Order
+        </button>
+        <button class="test-button" onclick="testUpdateOrder()">
+            ✏️ Update Last Order
+        </button>
+        <button class="test-button" onclick="testGetRecentOrders()">
+            🕒 GET Recent Orders
+        </button>
         <div id="order-results" class="result"></div>
     </div>
 
     <div class="test-container">
-        <h2>All Tests</h2>
-        <button class="test-button" onclick="runAllTests()" style="background: #28a745;">Run All Tests</button>
-        <div id="all-results" class="result"></div>
+        <h2>🔍 Data Persistence Test</h2>
+        <p>The big test - does data actually persist in Vercel KV?</p>
+        <button class="test-button" onclick="testDataPersistence()">
+            💾 Full Persistence Test
+        </button>
+        <button class="test-button danger" onclick="clearAllData()">
+            🗑️ Clear All Data
+        </button>
+        <div id="persistence-results" class="result"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>🚀 Rapid Fire Test</h2>
+        <p>Test multiple operations quickly to check for race conditions:</p>
+        <button class="test-button" onclick="rapidFireTest()">
+            ⚡ Run Rapid Fire Test
+        </button>
+        <div id="rapidfire-results" class="result"></div>
     </div>
 
     <script>
+        let testOrderId = null;
+
         async function makeRequest(url, options = {}) {
+            const timestamp = new Date().toLocaleTimeString();
             try {
-                console.log(`Making request: ${options.method || 'GET'} ${url}`);
+                console.log(`[${timestamp}] Making request: ${options.method || 'GET'} ${url}`);
                 const response = await fetch(url, {
                     headers: {
                         'Content-Type': 'application/json',
@@ -58,6 +147,7 @@
                 }
                 
                 return {
+                    timestamp,
                     status: response.status,
                     ok: response.ok,
                     data: data,
@@ -66,6 +156,7 @@
                 };
             } catch (error) {
                 return {
+                    timestamp,
                     status: 0,
                     ok: false,
                     error: error.message,
@@ -75,22 +166,31 @@
             }
         }
 
-        function displayResult(containerId, result) {
+        function displayResult(containerId, result, append = true) {
             const container = document.getElementById(containerId);
             const statusClass = result.ok ? 'success' : 'error';
-            const timestamp = new Date().toLocaleTimeString();
+            const statusIcon = result.ok ? '✅' : '❌';
             
-            container.innerHTML += `
-<span class="${statusClass}">[${timestamp}] ${result.method} ${result.url}</span>
-Status: ${result.status} ${result.ok ? '✅' : '❌'}
+            const output = `
+[${result.timestamp}] ${result.method} ${result.url} ${statusIcon}
+Status: ${result.status} ${result.ok ? '(Success)' : '(Failed)'}
 ${result.error ? 'Error: ' + result.error : 'Response: ' + JSON.stringify(result.data, null, 2)}
 
 `;
+            
+            if (append) {
+                container.innerHTML += output;
+            } else {
+                container.innerHTML = output;
+            }
+            container.scrollTop = container.scrollHeight;
         }
 
+        // Kitchen Status Tests
         async function testKitchenGet() {
             const result = await makeRequest('/api/orders?kitchen-status=true');
             displayResult('kitchen-results', result);
+            return result;
         }
 
         async function testKitchenOpen() {
@@ -99,6 +199,7 @@ ${result.error ? 'Error: ' + result.error : 'Response: ' + JSON.stringify(result
                 body: JSON.stringify({ isOpen: true })
             });
             displayResult('kitchen-results', result);
+            return result;
         }
 
         async function testKitchenClose() {
@@ -107,51 +208,168 @@ ${result.error ? 'Error: ' + result.error : 'Response: ' + JSON.stringify(result
                 body: JSON.stringify({ isOpen: false })
             });
             displayResult('kitchen-results', result);
+            return result;
         }
 
+        // Order Tests
         async function testGetOrders() {
             const result = await makeRequest('/api/orders');
             displayResult('order-results', result);
+            return result;
         }
 
         async function testCreateOrder() {
+            const orderData = {
+                food: 'Test Chicken Nuggets',
+                room: 'TEST-ROOM',
+                name: 'KV Test User',
+                comments: `Test order created at ${new Date().toLocaleTimeString()}`
+            };
+            
             const result = await makeRequest('/api/orders', {
                 method: 'POST',
-                body: JSON.stringify({
-                    food: 'Test Nuggets',
-                    room: 'TEST',
-                    name: 'API Test',
-                    comments: 'This is a test order'
-                })
+                body: JSON.stringify(orderData)
             });
-            displayResult('order-results', result);
-        }
-
-        async function testGetCompletedOrders() {
-            const result = await makeRequest('/api/orders?completed-orders=true');
-            displayResult('order-results', result);
-        }
-
-        async function runAllTests() {
-            document.getElementById('all-results').innerHTML = 'Running all tests...\n\n';
             
-            const tests = [
-                { name: 'Kitchen Status GET', fn: testKitchenGet },
-                { name: 'Kitchen Open POST', fn: testKitchenOpen },
-                { name: 'Kitchen Close POST', fn: testKitchenClose },
-                { name: 'Get Orders', fn: testGetOrders },
-                { name: 'Create Order', fn: testCreateOrder },
-                { name: 'Get Recent Orders', fn: testGetCompletedOrders }
-            ];
-            
-            for (const test of tests) {
-                document.getElementById('all-results').innerHTML += `Running ${test.name}...\n`;
-                await test.fn();
-                await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between tests
+            // Store the order ID for later tests
+            if (result.ok && result.data.order) {
+                testOrderId = result.data.order.id;
             }
             
-            document.getElementById('all-results').innerHTML += '\n✅ All tests completed! Check individual sections for results.';
+            displayResult('order-results', result);
+            return result;
         }
+
+        async function testUpdateOrder() {
+            if (!testOrderId) {
+                displayResult('order-results', {
+                    timestamp: new Date().toLocaleTimeString(),
+                    ok: false,
+                    error: 'No test order available. Create an order first.',
+                    status: 400
+                });
+                return;
+            }
+
+            const result = await makeRequest(`/api/orders?update-order=${testOrderId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ status: 'accepted' })
+            });
+            displayResult('order-results', result);
+            return result;
+        }
+
+        async function testGetRecentOrders() {
+            const result = await makeRequest('/api/orders?completed-orders=true');
+            displayResult('order-results', result);
+            return result;
+        }
+
+        // Data Persistence Test
+        async function testDataPersistence() {
+            const container = document.getElementById('persistence-results');
+            container.innerHTML = '🧪 Testing data persistence...\n\n';
+            
+            try {
+                // 1. Set kitchen to open
+                container.innerHTML += '1️⃣ Setting kitchen to OPEN...\n';
+                const openResult = await testKitchenOpen();
+                if (!openResult.ok) throw new Error('Failed to open kitchen');
+                
+                // 2. Create a test order
+                container.innerHTML += '2️⃣ Creating test order...\n';
+                const orderResult = await testCreateOrder();
+                if (!orderResult.ok) throw new Error('Failed to create order');
+                
+                // 3. Wait a moment
+                container.innerHTML += '3️⃣ Waiting 2 seconds...\n';
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // 4. Check if data persisted
+                container.innerHTML += '4️⃣ Checking kitchen status persistence...\n';
+                const statusCheck = await testKitchenGet();
+                
+                container.innerHTML += '5️⃣ Checking order persistence...\n';
+                const ordersCheck = await testGetOrders();
+                
+                // 6. Results
+                const kitchenPersisted = statusCheck.ok && statusCheck.data.isOpen === true;
+                const ordersPersisted = ordersCheck.ok && ordersCheck.data.length > 0;
+                
+                container.innerHTML += `\n🎯 PERSISTENCE TEST RESULTS:\n`;
+                container.innerHTML += `Kitchen Status: ${kitchenPersisted ? '✅ PERSISTED' : '❌ LOST'}\n`;
+                container.innerHTML += `Orders Data: ${ordersPersisted ? '✅ PERSISTED' : '❌ LOST'}\n`;
+                
+                if (kitchenPersisted && ordersPersisted) {
+                    container.innerHTML += `\n🎉 SUCCESS! Vercel KV is working perfectly!\n`;
+                } else {
+                    container.innerHTML += `\n⚠️ ISSUE: Some data did not persist. Check KV setup.\n`;
+                }
+                
+            } catch (error) {
+                container.innerHTML += `\n❌ PERSISTENCE TEST FAILED: ${error.message}\n`;
+            }
+        }
+
+        async function clearAllData() {
+            if (!confirm('Are you sure you want to clear ALL test data?')) return;
+            
+            const result = await makeRequest('/api/orders', {
+                method: 'POST',
+                body: JSON.stringify([])
+            });
+            displayResult('persistence-results', result, false);
+        }
+
+        // Rapid Fire Test
+        async function rapidFireTest() {
+            const container = document.getElementById('rapidfire-results');
+            container.innerHTML = '⚡ Running rapid fire test...\n\n';
+            
+            const operations = [
+                () => testKitchenOpen(),
+                () => testCreateOrder(),
+                () => testKitchenClose(),
+                () => testGetOrders(),
+                () => testKitchenOpen(),
+                () => testGetRecentOrders()
+            ];
+            
+            let successCount = 0;
+            let totalCount = operations.length;
+            
+            for (let i = 0; i < operations.length; i++) {
+                container.innerHTML += `Operation ${i + 1}/${totalCount}: `;
+                try {
+                    const result = await operations[i]();
+                    if (result.ok) {
+                        container.innerHTML += '✅ Success\n';
+                        successCount++;
+                    } else {
+                        container.innerHTML += `❌ Failed (${result.status})\n`;
+                    }
+                } catch (error) {
+                    container.innerHTML += `❌ Error: ${error.message}\n`;
+                }
+                
+                // Small delay between operations
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            container.innerHTML += `\n🎯 RAPID FIRE RESULTS: ${successCount}/${totalCount} operations succeeded\n`;
+            
+            if (successCount === totalCount) {
+                container.innerHTML += `🎉 PERFECT! No race conditions detected!\n`;
+            } else {
+                container.innerHTML += `⚠️ Some operations failed. Check for race conditions.\n`;
+            }
+        }
+
+        // Auto-run basic test on page load
+        window.addEventListener('load', async () => {
+            console.log('🧪 Auto-running basic connectivity test...');
+            await testKitchenGet();
+        });
     </script>
 </body>
 </html>

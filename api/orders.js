@@ -1,4 +1,6 @@
-// api/orders.js - Fixed version
+// api/orders.js - Vercel KV Storage version
+import { kv } from '@vercel/kv';
+
 export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,73 +13,38 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { url, method } = req;
-    console.log(`[API] ${method} ${url}`);
+    const { method } = req;
+    console.log(`[API] ${method} ${req.url}`);
 
-    // FIXED: Use req.url instead of url variable
+    // Parse URL and query parameters
     const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = urlObj.pathname;
     const searchParams = urlObj.searchParams;
 
     console.log(`[API] Parsed URL - pathname: ${pathname}, search: ${urlObj.search}`);
 
-    // Environment variables for JSONBin
-    const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
-    const JSONBIN_DATA_ID = process.env.JSONBIN_DATA_ID;
+    // KV storage key
+    const DATA_KEY = 'food_order_data';
 
-    console.log(`[API] Environment check:`);
-    console.log(`[API] - JSONBIN_API_KEY: ${JSONBIN_API_KEY ? 'Set (' + JSONBIN_API_KEY.substring(0, 10) + '...)' : 'Missing'}`);
-    console.log(`[API] - JSONBIN_DATA_ID: ${JSONBIN_DATA_ID ? 'Set (' + JSONBIN_DATA_ID + ')' : 'Missing'}`);
-
-    if (!JSONBIN_API_KEY || !JSONBIN_DATA_ID) {
-      console.error('[API] Missing required environment variables');
-      return res.status(500).json({ 
-        error: 'Server configuration error - missing API keys',
-        details: {
-          hasApiKey: !!JSONBIN_API_KEY,
-          hasDataId: !!JSONBIN_DATA_ID
-        }
-      });
-    }
-
-    // Helper to call JSONBin
-    async function callJSONBin(binId, options = {}) {
-      const url = `https://api.jsonbin.io/v3/b/${binId}`;
-      try {
-        console.log(`[API] Calling JSONBin: ${options.method || 'GET'} ${url}`);
-        
-        const response = await fetch(url, {
-          headers: {
-            'X-Master-Key': JSONBIN_API_KEY,
-            'Content-Type': 'application/json',
-            ...options.headers
-          },
-          ...options,
-        });
-
-        console.log(`[API] JSONBin response status: ${response.status}`);
-        
-        if (!response.ok) {
-          const text = await response.text();
-          console.error(`[API] JSONBin error (${response.status}): ${text}`);
-          throw new Error(`JSONBin responded with ${response.status}: ${text}`);
-        }
-
-        const result = await response.json();
-        console.log(`[API] JSONBin success - data keys:`, Object.keys(result));
-        return result;
-      } catch (err) {
-        console.error(`[API] Failed to call JSONBin:`, err.message);
-        throw err;
-      }
-    }
-
-    // Helper to get current data structure
+    // Helper to get data from Vercel KV
     async function getCurrentData() {
       try {
-        const response = await callJSONBin(JSONBIN_DATA_ID);
-        const data = response.record || {};
+        console.log('[API] Reading data from Vercel KV');
         
+        const data = await kv.get(DATA_KEY);
+        
+        if (!data) {
+          console.log('[API] No data found in KV, creating default data');
+          const defaultData = {
+            orders: [],
+            completedOrders: [],
+            kitchenOpen: false,
+            nextOrderId: 1
+          };
+          await kv.set(DATA_KEY, defaultData);
+          return defaultData;
+        }
+
         // Ensure proper data structure and validate orders
         const validatedData = {
           orders: [],
@@ -89,40 +56,46 @@ export default async function handler(req, res) {
         // Validate and filter orders array
         if (Array.isArray(data.orders)) {
           validatedData.orders = data.orders.filter(order => {
-            // Must have required fields and not be kitchen status data
             return order && 
                    typeof order.id === 'string' && 
                    typeof order.food === 'string' &&
                    typeof order.room === 'string' &&
                    typeof order.name === 'string' &&
-                   typeof order.status === 'string' &&
-                   !order.hasOwnProperty('isOpen') && // Filter out kitchen status data
-                   !order.hasOwnProperty('lastUpdated');
+                   typeof order.status === 'string';
           });
         }
 
+        console.log(`[API] Data loaded from KV - ${validatedData.orders.length} active orders, ${validatedData.completedOrders.length} completed, kitchen: ${validatedData.kitchenOpen}`);
         return validatedData;
       } catch (err) {
-        console.error('[API] Could not get existing data:', err.message);
-        return {
+        console.error('[API] Could not read from KV:', err.message);
+        // Return default data structure
+        const defaultData = {
           orders: [],
           completedOrders: [],
           kitchenOpen: false,
           nextOrderId: 1
         };
+        
+        // Try to create the default data in KV
+        try {
+          await kv.set(DATA_KEY, defaultData);
+          console.log('[API] Created new data in KV with defaults');
+        } catch (createErr) {
+          console.error('[API] Could not create data in KV:', createErr.message);
+        }
+        
+        return defaultData;
       }
     }
 
-    // Helper to save data structure
+    // Helper to save data to Vercel KV
     async function saveData(data) {
       try {
-        await callJSONBin(JSONBIN_DATA_ID, {
-          method: "PUT",
-          body: JSON.stringify(data),
-        });
-        console.log('[API] Data saved successfully');
+        await kv.set(DATA_KEY, data);
+        console.log('[API] Data saved successfully to Vercel KV');
       } catch (err) {
-        console.error('[API] Failed to save data:', err.message);
+        console.error('[API] Failed to save data to KV:', err.message);
         throw err;
       }
     }
@@ -187,7 +160,7 @@ export default async function handler(req, res) {
           console.log(`[API] Kitchen status POST - updating to: ${data.kitchenOpen}`);
           
           await saveData(data);
-          console.log('[API] Kitchen status POST - data saved successfully');
+          console.log('[API] Kitchen status POST - data saved successfully to KV');
 
           return res.status(200).json({ 
             success: true, 
@@ -202,7 +175,6 @@ export default async function handler(req, res) {
         }
       }
       
-      // Method not allowed for kitchen-status
       return res.status(405).json({ error: `Method ${method} not allowed for kitchen-status` });
     }
 
@@ -213,7 +185,6 @@ export default async function handler(req, res) {
       if (method === 'GET') {
         try {
           const data = await getCurrentData();
-          // Return recent orders (active + completed, limited to 10 most recent)
           const allRecentOrders = [
             ...data.orders.map(order => ({ ...order, isActive: true })),
             ...data.completedOrders.map(order => ({ ...order, isActive: false }))
@@ -235,7 +206,7 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: `Method ${method} not allowed for completed-orders` });
     }
 
-    // Handle update order status using query parameter
+    // Handle update order status
     if (searchParams.has('update-order')) {
       console.log('[API] Update order route');
       
@@ -272,11 +243,9 @@ export default async function handler(req, res) {
               })
             };
             
-            // Move to completed orders
             data.completedOrders.push(completedOrder);
             data.orders.splice(orderIndex, 1);
             
-            // Keep only recent completed orders
             if (data.completedOrders.length > 50) {
               data.completedOrders = data.completedOrders.slice(-50);
             }
@@ -302,7 +271,7 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: `Method ${method} not allowed for update-order` });
     }
 
-    // Handle delete order using query parameter
+    // Handle delete order
     if (searchParams.has('delete-order')) {
       console.log('[API] Delete order route');
       
@@ -320,7 +289,6 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: 'Order not found' });
           }
           
-          // Remove the order completely (no trace)
           const deletedOrder = data.orders[orderIndex];
           data.orders.splice(orderIndex, 1);
           
@@ -346,10 +314,10 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: `Method ${method} not allowed for delete-order` });
     }
 
-    // Handle main orders routes (no query parameters)
+    // Handle main orders routes
     if (!searchParams.has('kitchen-status') && !searchParams.has('completed-orders') && !searchParams.has('update-order') && !searchParams.has('delete-order')) {
       
-      // GET all orders (active orders only)
+      // GET all orders
       if (method === 'GET') {
         try {
           const data = await getCurrentData();
@@ -367,11 +335,10 @@ export default async function handler(req, res) {
           const body = await parseBody(req);
           const data = await getCurrentData();
           
-          // If body is an empty array, clear all orders
+          // Clear all orders
           if (Array.isArray(body) && body.length === 0) {
             console.log('[API] Clearing all orders');
             
-            // Move active orders to completed before clearing
             const activeOrders = data.orders.map(order => ({
               ...order,
               status: 'completed',
@@ -388,13 +355,11 @@ export default async function handler(req, res) {
             
             data.completedOrders = [...data.completedOrders, ...activeOrders];
             
-            // Keep only recent 50 completed orders
             if (data.completedOrders.length > 50) {
               data.completedOrders = data.completedOrders.slice(-50);
             }
             
             data.orders = [];
-            
             await saveData(data);
             
             return res.status(200).json({ 
@@ -402,7 +367,7 @@ export default async function handler(req, res) {
               message: 'All orders cleared'
             });
           } 
-          // Single order - add to existing orders
+          // Add new order
           else if (body && typeof body === 'object' && body.food && body.room && body.name) {
             console.log('[API] Adding new order');
             
@@ -457,7 +422,7 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Endpoint not found" });
 
   } catch (err) {
-    // Global error handler - catches any unhandled errors
+    // Global error handler
     console.error('[API] Unhandled error:', err);
     return res.status(500).json({ 
       error: "Internal server error", 
