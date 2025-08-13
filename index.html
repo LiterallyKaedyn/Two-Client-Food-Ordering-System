@@ -219,6 +219,8 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            position: relative;
+            z-index: 5;
         }
 
         .status-btn {
@@ -233,11 +235,20 @@
             background: rgba(255, 255, 255, 0.2);
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.3);
+            position: relative;
+            z-index: 10;
+            pointer-events: auto;
         }
 
         .status-btn:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: scale(1.05);
+        }
+
+        .status-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .no-orders {
@@ -741,7 +752,7 @@
                     updateData.completedAt = getNZTime();
                 }
 
-                debugLog(`Updating order ${id} to status ${status}`);
+                console.error(`[API CALL] PUT /api/orders/${id} with status: ${status}`);
                 const response = await fetch(`/api/orders/${id}`, {
                     method: 'PUT',
                     headers: {
@@ -750,13 +761,17 @@
                     body: JSON.stringify(updateData)
                 });
 
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[API CALL] Error Response:`, response.status, errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
                 
                 const result = await response.json();
-                debugLog('Order status updated successfully');
+                console.error(`[API CALL] Success Response:`, result);
                 return result;
             } catch (error) {
-                console.error('Failed to update order:', error.message);
+                console.error('[API CALL] Exception:', error);
                 throw error;
             }
         }
@@ -1081,12 +1096,18 @@
 
         async function updateStatus(orderId, newStatus) {
             try {
+                console.error(`[UPDATE STATUS] Starting update for Order ${orderId} to ${newStatus}`);
+                
                 // Disable all buttons temporarily to prevent double-clicks
                 const buttons = document.querySelectorAll('.status-btn');
-                buttons.forEach(btn => btn.disabled = true);
+                buttons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.textContent = 'Updating...';
+                });
                 
-                console.log(`Attempting to update order ${orderId} to ${newStatus}`);
-                await updateOrderStatus(orderId, newStatus);
+                const result = await updateOrderStatus(orderId, newStatus);
+                console.error(`[UPDATE STATUS] Success:`, result);
+                
                 showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
                 
                 // Reload orders immediately
@@ -1094,12 +1115,22 @@
                 await loadRecentOrders();
                 
             } catch (error) {
-                console.error('Update status error:', error);
+                console.error('[UPDATE STATUS] Error:', error);
                 showMessage('error', 'Failed to update order status: ' + error.message);
                 
                 // Re-enable buttons on error
                 const buttons = document.querySelectorAll('.status-btn');
-                buttons.forEach(btn => btn.disabled = false);
+                buttons.forEach(btn => {
+                    btn.disabled = false;
+                    // Restore original text based on button's data attributes
+                    const status = btn.getAttribute('data-status');
+                    switch(status) {
+                        case 'accepted': btn.textContent = 'Accept'; break;
+                        case 'being-made': btn.textContent = 'Start Making'; break;
+                        case 'being-delivered': btn.textContent = 'Out for Delivery'; break;
+                        case 'completed': btn.textContent = 'Complete'; break;
+                    }
+                });
             }
         }
 
