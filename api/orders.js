@@ -114,9 +114,12 @@ export default async function handler(req, res) {
     if (method === 'POST') {
       try {
         const body = await parseBody(req);
+        console.log('[orders.js] Received POST body:', JSON.stringify(body, null, 2));
         
         // If body is an array, replace entire orders array
         if (Array.isArray(body)) {
+          console.log('[orders.js] Replacing entire orders array with', body.length, 'orders');
+          
           await callJSONBin(JSONBIN_ORDER_ID, {
             method: "PUT",
             body: JSON.stringify(body),
@@ -129,9 +132,20 @@ export default async function handler(req, res) {
           });
         } else {
           // Single order - add to existing orders
-          const existing = await callJSONBin(JSONBIN_ORDER_ID);
-          const existingOrders = Array.isArray(existing.record) ? existing.record : [];
+          console.log('[orders.js] Adding single order');
+          
+          let existingOrders = [];
+          try {
+            const existing = await callJSONBin(JSONBIN_ORDER_ID);
+            existingOrders = Array.isArray(existing.record) ? existing.record : [];
+            console.log('[orders.js] Found', existingOrders.length, 'existing orders');
+          } catch (err) {
+            console.warn('[orders.js] Could not get existing orders, starting fresh:', err.message);
+            existingOrders = [];
+          }
+          
           const updatedOrders = [...existingOrders, body];
+          console.log('[orders.js] Saving', updatedOrders.length, 'total orders');
 
           await callJSONBin(JSONBIN_ORDER_ID, {
             method: "PUT",
@@ -141,12 +155,17 @@ export default async function handler(req, res) {
           return res.status(201).json({ 
             success: true, 
             message: 'Order created',
-            order: body 
+            order: body,
+            totalOrders: updatedOrders.length
           });
         }
       } catch (err) {
         console.error('[orders.js] Failed to process orders:', err);
-        return res.status(500).json({ error: "Failed to process orders" });
+        return res.status(500).json({ 
+          error: "Failed to process orders", 
+          details: err.message,
+          stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        });
       }
     }
   }
