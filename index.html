@@ -44,12 +44,20 @@
         .header::after {
             content: '';
             position: absolute;
-            bottom: -3px;
+            bottom: -2px;
             left: 0;
             right: 0;
-            height: 25px;
+            height: 12px;
             background: #000;
-            clip-path: path('M0,15 C50,5 100,25 150,10 C200,20 250,5 300,18 C350,8 400,22 450,12 C500,25 550,8 600,20 C650,6 700,28 750,15 C800,10 850,25 900,18 C950,8 1000,22 1050,15 C1100,25 1150,10 1200,20 C1250,8 1300,25 1350,15 C1400,20 1450,10 1500,15 L1500,25 L0,25 Z');
+            background-image: 
+                radial-gradient(circle at 10% 50%, transparent 40%, #000 40%, #000 60%, transparent 60%),
+                radial-gradient(circle at 30% 50%, transparent 40%, #000 40%, #000 60%, transparent 60%),
+                radial-gradient(circle at 50% 50%, transparent 40%, #000 40%, #000 60%, transparent 60%),
+                radial-gradient(circle at 70% 50%, transparent 40%, #000 40%, #000 60%, transparent 60%),
+                radial-gradient(circle at 90% 50%, transparent 40%, #000 40%, #000 60%, transparent 60%);
+            background-size: 40px 100%;
+            background-repeat: repeat-x;
+            border-radius: 50px;
         }
 
         .header h1 {
