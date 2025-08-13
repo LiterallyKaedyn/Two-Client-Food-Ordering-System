@@ -1,0 +1,9 @@
+{
+  "name": "food-order-system",
+  "version": "1.0.0",
+  "description": "Multi-client food ordering system",
+  "dependencies": {
+    "@vercel/kv": "^1.0.0"
+  },
+  "type": "module"
+}

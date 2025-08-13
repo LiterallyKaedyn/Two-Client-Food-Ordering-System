@@ -243,7 +243,7 @@
             color: white;
         }
 
-        .clear-all-btn, .refresh-btn {
+        .clear-all-btn, .refresh-btn, .kitchen-status-btn {
             border: none;
             padding: 12px 25px;
             border-radius: 8px;
@@ -264,8 +264,41 @@
             color: white;
         }
 
-        .clear-all-btn:hover, .refresh-btn:hover {
+        .kitchen-status-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            font-size: 1em;
+            min-width: 150px;
+        }
+
+        .kitchen-status-btn.closed {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+        }
+
+        .clear-all-btn:hover, .refresh-btn:hover, .kitchen-status-btn:hover {
             transform: translateY(-1px);
+        }
+
+        .kitchen-closed-message {
+            text-align: center;
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 50px;
+            border-radius: 20px;
+            margin: 20px 0;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .kitchen-closed-message h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .kitchen-closed-message p {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            opacity: 0.9;
         }
 
         .loading {
@@ -303,38 +336,50 @@
         </div>
 
         <div class="nav-links">
-            <p class="nav-link">Place Order</p>
+            <a href="?page=order" class="nav-link" id="orderNavLink">Place Order</a>
+            <a href="?page=manager" class="nav-link" id="managerNavLink">Manage Orders</a>
         </div>
 
         <div class="content">
             <!-- Order Form Page -->
             <div id="orderPage" class="page">
-                <div class="success-message" id="successMessage"></div>
-                <div class="error-message" id="errorMessage"></div>
-                
-                <form id="orderForm">
-                    <div class="form-group">
-                        <label for="food">What food do you want:</label>
-                        <input type="text" id="food" name="food" required placeholder="e.g., Pizza Margherita, Chicken Sandwich...">
-                    </div>
+                <!-- Kitchen Closed Message -->
+                <div id="kitchenClosedMessage" class="kitchen-closed-message">
+                    <h2>🔴 Kitchen Closed</h2>
+                    <p>Nobody is available to complete your order at the moment.</p>
+                    <p>Please check back later when the kitchen reopens.</p>
+                </div>
+
+                <!-- Order Form (hidden when kitchen closed) -->
+                <div id="orderFormContainer">
+                    <div class="success-message" id="successMessage"></div>
+                    <div class="error-message" id="errorMessage"></div>
                     
-                    <div class="form-group">
-                        <label for="room">What room are you in:</label>
-                        <input type="text" id="room" name="room" required placeholder="e.g., Room 101, Conference Room A...">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="name">What is your name:</label>
-                        <input type="text" id="name" name="name" required placeholder="Your full name">
-                    </div>
-                    
-                    <button type="submit" class="submit-btn" id="submitBtn">Place Order</button>
-                </form>
+                    <form id="orderForm">
+                        <div class="form-group">
+                            <label for="food">What food do you want:</label>
+                            <input type="text" id="food" name="food" required placeholder="e.g., Pizza Margherita, Chicken Sandwich...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="room">What room are you in:</label>
+                            <input type="text" id="room" name="room" required placeholder="e.g., Room 101, Conference Room A...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="name">What is your name:</label>
+                            <input type="text" id="name" name="name" required placeholder="Your full name">
+                        </div>
+                        
+                        <button type="submit" class="submit-btn" id="submitBtn">Place Order</button>
+                    </form>
+                </div>
             </div>
 
             <!-- Manager Page -->
             <div id="managerPage" class="page">
                 <div class="manager-controls">
+                    <button class="kitchen-status-btn" id="kitchenToggle" onclick="toggleKitchenStatus()">🔴 Kitchen Closed</button>
                     <button class="refresh-btn" onclick="loadOrders()">🔄 Refresh Orders</button>
                     <button class="clear-all-btn" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
                 </div>
@@ -396,6 +441,17 @@
             });
         }
 
+        async function getKitchenStatus() {
+            return await apiCall('/kitchen-status');
+        }
+
+        async function setKitchenStatus(isOpen) {
+            return await apiCall('/kitchen-status', {
+                method: 'POST',
+                body: JSON.stringify({ isOpen })
+            });
+        }
+
         // UI Functions
         function showMessage(type, message, duration = 3000) {
             const messageEl = document.getElementById(`${type}Message`);
@@ -412,6 +468,81 @@
             return page === 'manager' ? 'manager' : 'order';
         }
 
+        // Kitchen status management
+        let kitchenOpen = false; // Kitchen starts closed
+
+        async function toggleKitchenStatus() {
+            try {
+                kitchenOpen = !kitchenOpen;
+                await setKitchenStatus(kitchenOpen);
+                updateKitchenButton();
+            } catch (error) {
+                console.error('Failed to update kitchen status:', error);
+                // Revert the status if API call failed
+                kitchenOpen = !kitchenOpen;
+            }
+        }
+
+        function updateKitchenButton() {
+            const button = document.getElementById('kitchenToggle');
+            if (kitchenOpen) {
+                button.textContent = '🟢 Kitchen Open';
+                button.classList.remove('closed');
+            } else {
+                button.textContent = '🔴 Kitchen Closed';
+                button.classList.add('closed');
+            }
+        }
+
+        async function checkKitchenStatus() {
+            try {
+                const response = await getKitchenStatus();
+                kitchenOpen = response.isOpen || false;
+                updateOrderPageDisplay();
+                if (getCurrentPage() === 'manager') {
+                    updateKitchenButton();
+                }
+            } catch (error) {
+                console.error('Failed to check kitchen status:', error);
+                kitchenOpen = false; // Default to closed if can't check
+                updateOrderPageDisplay();
+            }
+        }
+
+        function updateOrderPageDisplay() {
+            const closedMessage = document.getElementById('kitchenClosedMessage');
+            const formContainer = document.getElementById('orderFormContainer');
+            
+            if (kitchenOpen) {
+                closedMessage.style.display = 'none';
+                formContainer.style.display = 'block';
+            } else {
+                closedMessage.style.display = 'block';
+                formContainer.style.display = 'none';
+            }
+        }
+
+        // Auto-refresh functionality for manager page AND kitchen status check for order page
+        let autoRefreshInterval;
+        
+        function startAutoRefresh() {
+            // Refresh every 3 seconds
+            autoRefreshInterval = setInterval(() => {
+                if (getCurrentPage() === 'manager') {
+                    loadOrders();
+                } else if (getCurrentPage() === 'order') {
+                    checkKitchenStatus(); // Check if kitchen status changed
+                }
+            }, 3000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
         function showPage(pageName) {
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
@@ -426,10 +557,14 @@
                 document.getElementById('managerNavLink').classList.add('active');
                 document.getElementById('headerSubtitle').textContent = 'Manage and complete food orders';
                 loadOrders();
+                checkKitchenStatus(); // Update button status
+                startAutoRefresh();
             } else {
                 document.getElementById('orderPage').classList.add('active');
                 document.getElementById('orderNavLink').classList.add('active');
                 document.getElementById('headerSubtitle').textContent = 'Place your food order';
+                checkKitchenStatus(); // Check if orders are allowed
+                startAutoRefresh(); // Start checking kitchen status
             }
         }
 
@@ -524,6 +659,8 @@
             showPage(currentPage);
         }
 
+        // Clean up intervals when page unloads
+        window.addEventListener('beforeunload', stopAutoRefresh);
         window.addEventListener('popstate', init);
         document.addEventListener('DOMContentLoaded', init);
     </script>
