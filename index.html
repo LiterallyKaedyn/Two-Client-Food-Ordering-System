@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Order System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .nav-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .nav-link {
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: inline-block;
+        }
+
+        .nav-link.active {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(78, 205, 196, 0.3);
+        }
+
+        .nav-link:not(.active) {
+            background: #f8f9fa;
+            color: #666;
+            border: 2px solid #e9ecef;
+        }
+
+        .nav-link:not(.active):hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4ecdc4;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(238, 90, 82, 0.3);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .orders-container {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        }
+
+        .order-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .order-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .order-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .order-card:hover::before {
+            opacity: 1;
+        }
+
+        .order-card h3 {
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .order-info {
+            font-size: 1.1em;
+            line-height: 1.6;
+            position: relative;
+            z-index: 1;
+        }
+
+        .order-info strong {
+            color: #ffd700;
+        }
+
+        .no-orders {
+            text-align: center;
+            color: #666;
+            font-size: 1.3em;
+            margin-top: 50px;
+            padding: 40px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 2px dashed #dee2e6;
+        }
+
+        .success-message, .error-message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        .success-message {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .clear-all-btn, .refresh-btn {
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+            margin-right: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .clear-all-btn {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+        }
+
+        .clear-all-btn:hover, .refresh-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .nav-links {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .nav-link {
+                width: 200px;
+                text-align: center;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .orders-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍔 Food Order System</h1>
+            <p id="headerSubtitle">Place your order or manage existing orders</p>
+        </div>
+
+        <div class="nav-links">
+            <a href="?page=order" class="nav-link" id="orderNavLink">Place Order</a>
+            <a href="?page=manager" class="nav-link" id="managerNavLink">Manage Orders</a>
+        </div>
+
+        <div class="content">
+            <!-- Order Form Page -->
+            <div id="orderPage" class="page">
+                <div class="success-message" id="successMessage"></div>
+                <div class="error-message" id="errorMessage"></div>
+                
+                <form id="orderForm">
+                    <div class="form-group">
+                        <label for="food">What food do you want:</label>
+                        <input type="text" id="food" name="food" required placeholder="e.g., Pizza Margherita, Chicken Sandwich...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="room">What room are you in:</label>
+                        <input type="text" id="room" name="room" required placeholder="e.g., Room 101, Conference Room A...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="name">What is your name:</label>
+                        <input type="text" id="name" name="name" required placeholder="Your full name">
+                    </div>
+                    
+                    <button type="submit" class="submit-btn" id="submitBtn">Place Order</button>
+                </form>
+            </div>
+
+            <!-- Manager Page -->
+            <div id="managerPage" class="page">
+                <div class="manager-controls">
+                    <button class="refresh-btn" onclick="loadOrders()">🔄 Refresh Orders</button>
+                    <button class="clear-all-btn" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
+                </div>
+                <div class="loading" id="loading">Loading orders...</div>
+                <div id="ordersContainer" class="orders-container"></div>
+                <div id="noOrders" class="no-orders" style="display: none;">
+                    No orders yet! 📝<br>
+                    Orders will appear here as they are placed.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        // API functions
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API call failed:', error);
+                throw error;
+            }
+        }
+
+        async function getOrders() {
+            return await apiCall('/orders');
+        }
+
+        async function addOrder(order) {
+            return await apiCall('/orders', {
+                method: 'POST',
+                body: JSON.stringify(order)
+            });
+        }
+
+        async function deleteOrder(id) {
+            return await apiCall(`/orders?id=${id}`, {
+                method: 'DELETE'
+            });
+        }
+
+        async function clearOrders() {
+            return await apiCall('/orders', {
+                method: 'DELETE'
+            });
+        }
+
+        // UI Functions
+        function showMessage(type, message, duration = 3000) {
+            const messageEl = document.getElementById(`${type}Message`);
+            messageEl.textContent = message;
+            messageEl.style.display = 'block';
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, duration);
+        }
+
+        function getCurrentPage() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const page = urlParams.get('page');
+            return page === 'manager' ? 'manager' : 'order';
+        }
+
+        function showPage(pageName) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            if (pageName === 'manager') {
+                document.getElementById('managerPage').classList.add('active');
+                document.getElementById('managerNavLink').classList.add('active');
+                document.getElementById('headerSubtitle').textContent = 'Manage and complete food orders';
+                loadOrders();
+            } else {
+                document.getElementById('orderPage').classList.add('active');
+                document.getElementById('orderNavLink').classList.add('active');
+                document.getElementById('headerSubtitle').textContent = 'Place your food order';
+            }
+        }
+
+        // Order form handling
+        document.getElementById('orderForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Placing Order...';
+            
+            try {
+                const formData = new FormData(this);
+                const order = {
+                    food: formData.get('food'),
+                    room: formData.get('room'),
+                    name: formData.get('name')
+                };
+                
+                await addOrder(order);
+                this.reset();
+                showMessage('success', 'Order placed successfully! 🎉');
+                
+            } catch (error) {
+                showMessage('error', 'Failed to place order. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Place Order';
+            }
+        });
+
+        // Manager functions
+        async function loadOrders() {
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('ordersContainer');
+            const noOrdersMsg = document.getElementById('noOrders');
+            
+            loading.style.display = 'block';
+            container.innerHTML = '';
+            noOrdersMsg.style.display = 'none';
+            
+            try {
+                const response = await getOrders();
+                const orders = response.orders || [];
+                
+                loading.style.display = 'none';
+                
+                if (orders.length === 0) {
+                    noOrdersMsg.style.display = 'block';
+                } else {
+                    container.innerHTML = orders.map((order, index) => `
+                        <div class="order-card" onclick="completeOrder('${order.id}')">
+                            <h3>Order #${index + 1}</h3>
+                            <div class="order-info">
+                                <strong>Food:</strong> ${order.food}<br>
+                                <strong>Room:</strong> ${order.room}<br>
+                                <strong>Name:</strong> ${order.name}<br>
+                                <strong>Time:</strong> ${order.timestamp}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                loading.style.display = 'none';
+                container.innerHTML = '<div class="error-message" style="display: block;">Failed to load orders. Please refresh.</div>';
+            }
+        }
+
+        async function completeOrder(orderId) {
+            try {
+                await deleteOrder(orderId);
+                loadOrders();
+            } catch (error) {
+                showMessage('error', 'Failed to complete order. Please try again.');
+            }
+        }
+
+        async function clearAllOrders() {
+            if (confirm('Are you sure you want to clear all orders?')) {
+                try {
+                    await clearOrders();
+                    loadOrders();
+                } catch (error) {
+                    showMessage('error', 'Failed to clear orders. Please try again.');
+                }
+            }
+        }
+
+        // Initialize
+        function init() {
+            const currentPage = getCurrentPage();
+            showPage(currentPage);
+        }
+
+        window.addEventListener('popstate', init);
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
