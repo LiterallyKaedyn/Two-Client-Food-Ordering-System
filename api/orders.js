@@ -15,9 +15,10 @@ export default async function handler(req, res) {
     const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
     try {
-        const { pathname } = new URL(req.url, `http://${req.headers.host}`);
-
-        if (pathname === '/api/kitchen-status') {
+        // Check if this is a kitchen-status request by looking at the URL path
+        const isKitchenStatusRequest = req.url && req.url.includes('kitchen-status');
+        
+        if (isKitchenStatusRequest) {
             // Handle kitchen status endpoints
             if (req.method === 'GET') {
                 try {
