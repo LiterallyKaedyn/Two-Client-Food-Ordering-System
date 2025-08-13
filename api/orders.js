@@ -1,4 +1,4 @@
-// api/orders.js - Clean working version
+// api/orders.js - Fixed version
 export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,10 +14,12 @@ export default async function handler(req, res) {
     const { url, method } = req;
     console.log(`[API] ${method} ${url}`);
 
-    // Parse URL and query parameters
-    const urlObj = new URL(url, 'http://localhost');
+    // FIXED: Use req.url instead of url variable
+    const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = urlObj.pathname;
     const searchParams = urlObj.searchParams;
+
+    console.log(`[API] Parsed URL - pathname: ${pathname}, search: ${urlObj.search}`);
 
     // Environment variables for JSONBin
     const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
@@ -156,11 +158,12 @@ export default async function handler(req, res) {
 
     // Handle kitchen status routes
     if (searchParams.has('kitchen-status')) {
-      console.log('[API] Kitchen status route');
+      console.log('[API] Kitchen status route detected');
       
       if (method === 'GET') {
         try {
           const data = await getCurrentData();
+          console.log(`[API] Kitchen status GET - returning: ${data.kitchenOpen}`);
           return res.status(200).json({ 
             isOpen: data.kitchenOpen
           });
@@ -172,24 +175,35 @@ export default async function handler(req, res) {
       
       if (method === 'POST') {
         try {
+          console.log('[API] Kitchen status POST - parsing body...');
           const body = await parseBody(req);
+          console.log('[API] Kitchen status POST - body received:', body);
+          
           const data = await getCurrentData();
+          console.log('[API] Kitchen status POST - current data loaded');
           
           // Update kitchen status only
           data.kitchenOpen = Boolean(body.isOpen);
+          console.log(`[API] Kitchen status POST - updating to: ${data.kitchenOpen}`);
           
           await saveData(data);
+          console.log('[API] Kitchen status POST - data saved successfully');
 
-          console.log(`[API] Kitchen status updated to: ${data.kitchenOpen}`);
           return res.status(200).json({ 
             success: true, 
             isOpen: data.kitchenOpen
           });
         } catch (err) {
           console.error('[API] Failed to update kitchen status:', err.message);
-          return res.status(500).json({ error: "Failed to update kitchen status" });
+          return res.status(500).json({ 
+            error: "Failed to update kitchen status",
+            details: err.message 
+          });
         }
       }
+      
+      // Method not allowed for kitchen-status
+      return res.status(405).json({ error: `Method ${method} not allowed for kitchen-status` });
     }
 
     // Handle completed orders route
@@ -217,6 +231,8 @@ export default async function handler(req, res) {
           return res.status(200).json([]);
         }
       }
+      
+      return res.status(405).json({ error: `Method ${method} not allowed for completed-orders` });
     }
 
     // Handle update order status using query parameter
@@ -282,6 +298,8 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: "Failed to update order: " + err.message });
         }
       }
+      
+      return res.status(405).json({ error: `Method ${method} not allowed for update-order` });
     }
 
     // Handle delete order using query parameter
@@ -324,6 +342,8 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: "Failed to delete order: " + err.message });
         }
       }
+      
+      return res.status(405).json({ error: `Method ${method} not allowed for delete-order` });
     }
 
     // Handle main orders routes (no query parameters)
@@ -428,6 +448,8 @@ export default async function handler(req, res) {
           });
         }
       }
+      
+      return res.status(405).json({ error: `Method ${method} not allowed for main orders route` });
     }
 
     // 404 for everything else
