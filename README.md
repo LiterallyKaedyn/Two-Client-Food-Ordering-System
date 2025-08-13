@@ -1,0 +1,1 @@
+For any assistance, look [at the wiki](https://github.com/LiterallyKaedyn/Two-Client-Food-Ordering-System/wiki).

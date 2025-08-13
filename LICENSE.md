@@ -1,0 +1,52 @@
+     __        __            ____     _____                        ____         __                  __   _       _ __         __
+ __ / /__ ___ / /____ ____  / __/__  / _/ /__    _____ ________   / __/_ _____ / /____ __ _  ___   / /  (_)_ _  (_) /____ ___/ /
+/ // / -_|_-</ __/ -_) __/ _\ \/ _ \/ _/ __/ |/|/ / _ `/ __/ -_) _\ \/ // (_-</ __/ -_)  ' \(_-<  / /__/ /  ' \/ / __/ -_) _  / 
+\___/\__/___/\__/\__/_/   /___/\___/_/ \__/|__,__/\_,_/_/  \__/ /___/\_, /___/\__/\__/_/_/_/___/ /____/_/_/_/_/_/\__/\__/\_,_/  
+                                                                    /___/                                                             
+JSS LIMITED GENERAL PUBLIC LICENSE 002
+Version 1, 14th March 2025
+
+Copyright (c) 2025 Jester Software Systems Limited
+https://jestersoftware.org
+
+Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
+
+- TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION, AND MODIFICATION -
+
+0. Definitions
+“This License” refers to version 1 of the JSS Limited General Public License.
+“The Program” refers to any software or work licensed under this License.
+“You” refers to an individual or entity that exercises permissions granted by this License.
+
+1. Permission to Use, Copy, and Distribute
+You may copy and distribute exact copies of the Program’s required source code necessary for the software to function, in any medium, provided that you include a copy of this License and all notices stating that this License applies to the Program. You may not impose further restrictions on the recipients' exercise of the rights granted herein.
+
+2. Modifications and Derived Works
+You may modify your copy of the Program or any portion of it and distribute your modifications under the following conditions:
+- The modified work must be licensed under this same License.
+- You must clearly indicate changes made to the Program.
+- You must include a prominent notice stating that you changed the files and the date of any modifications.
+
+3. Distribution of Executable Versions
+You may distribute compiled or executable forms of the Program under the following conditions:
+- The required corresponding source code necessary for functionality must be made available under the terms of this License.
+- Any modifications must be clearly documented and publicly accessible.
+
+4. No Warranty
+THE PROGRAM IS PROVIDED “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.
+
+5. Limitation of Liability
+IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW SHALL JESTER SOFTWARE SYSTEMS LIMITED OR ANY CONTRIBUTOR BE LIABLE FOR ANY DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+6. Termination
+If you violate any terms of this License, your rights under this License will terminate automatically. Continued use or distribution of the Program after termination is prohibited.
+
+7. Acceptance
+By using, copying, modifying, or distributing the Program, you indicate your acceptance of this License and all its terms and conditions.
+
+8. Future License Versions
+Jester Software Systems Limited may publish updated versions of this License. Future versions will be similar in spirit to the current version but may address new concerns. If the Program specifies a particular version, you may use that version or any later version published by Jester Software Systems Limited.
+
+9. Licensing for HTML and CSS
+To properly license HTML or CSS, add the following notice in your code: 
+  "Licensed with the JSS Limited General Public License 002 - https://github.com/Jester-Software-Systems/JSS_LICENSE_DIRECTORY/blob/2025-Licenses/MARCH/JSS-GPL2"
