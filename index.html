@@ -391,6 +391,16 @@
             color: #155724;
         }
 
+        .completed-order.active-order {
+            background: #e3f2fd;
+            border-color: #90caf9;
+        }
+
+        .completed-order.active-order h4,
+        .completed-order.active-order p {
+            color: #1565c0;
+        }
+
         .order-tracking {
             text-align: center;
             max-width: 600px;
@@ -632,10 +642,6 @@
             });
         }
 
-        function generateOrderId() {
-            return Date.now().toString().slice(-6);
-        }
-
         // UI Functions
         function showMessage(type, message, duration = 3000) {
             const messageEl = document.getElementById(`${type}Message`);
@@ -666,7 +672,7 @@
             window.location.href = window.location.pathname;
         }
 
-        // API functions
+        // Enhanced API functions with better error handling
         async function getOrders() {
             try {
                 const response = await fetch('/api/orders');
@@ -681,21 +687,14 @@
 
         async function addOrder(order) {
             try {
-                const orderWithMeta = {
-                    id: generateOrderId(),
-                    ...order,
-                    timestamp: getNZTime(),
-                    status: 'pending'
-                };
-
-                console.log('Adding order:', orderWithMeta);
+                console.log('Adding order:', order);
 
                 const response = await fetch('/api/orders', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(orderWithMeta)
+                    body: JSON.stringify(order)
                 });
 
                 if (!response.ok) {
@@ -707,10 +706,7 @@
                 const result = await response.json();
                 console.log('Order added successfully:', result);
                 
-                return { 
-                    message: 'Order created', 
-                    order: orderWithMeta 
-                };
+                return result;
             } catch (error) {
                 console.error('Failed to add order:', error);
                 throw error;
@@ -730,30 +726,23 @@
 
         async function updateOrderStatus(id, status) {
             try {
-                const response = await getOrders();
-                const orders = response.orders;
-                const orderIndex = orders.findIndex(o => o.id === id);
-                
-                if (orderIndex === -1) {
-                    throw new Error('Order not found');
-                }
-
-                orders[orderIndex].status = status;
+                const updateData = { status };
                 if (status === 'completed') {
-                    orders[orderIndex].completedAt = getNZTime();
+                    updateData.completedAt = getNZTime();
                 }
 
-                const updateResponse = await fetch('/api/orders', {
-                    method: 'POST',
+                const response = await fetch(`/api/orders/${id}`, {
+                    method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(orders)
+                    body: JSON.stringify(updateData)
                 });
 
-                if (!updateResponse.ok) throw new Error(`HTTP ${updateResponse.status}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
-                return { message: 'Order updated', order: orders[orderIndex] };
+                const result = await response.json();
+                return result;
             } catch (error) {
                 console.error('Failed to update order:', error);
                 throw error;
@@ -805,6 +794,18 @@
             } catch (error) {
                 console.error('Failed to set kitchen status:', error);
                 throw error;
+            }
+        }
+
+        async function getRecentOrders() {
+            try {
+                const response = await fetch('/api/orders/completed-orders');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const orders = await response.json();
+                return { orders: Array.isArray(orders) ? orders : [] };
+            } catch (error) {
+                console.error('Failed to get recent orders:', error);
+                return { orders: [] };
             }
         }
 
@@ -963,8 +964,12 @@
                 const response = await addOrder(order);
                 this.reset();
                 
-                // Redirect to tracking page
-                window.location.href = `?id=${response.order.id}`;
+                // Redirect to tracking page with the returned order ID
+                if (response.order && response.order.id) {
+                    window.location.href = `?id=${response.order.id}`;
+                } else {
+                    showMessage('success', 'Order placed successfully!');
+                }
                 
             } catch (error) {
                 console.error('Order submission error:', error);
@@ -972,6 +977,7 @@
                     ? 'Server error. Please check your API configuration and try again.' 
                     : 'Failed to place order. Please try again.';
                 showMessage('error', errorMessage);
+            } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Place Order';
             }
@@ -991,16 +997,13 @@
                 const response = await getOrders();
                 const orders = response.orders || [];
                 
-                // Filter out completed orders for the main view
-                const activeOrders = orders.filter(order => order.status !== 'completed');
-                
                 if (loading) loading.style.display = 'none';
-                lastOrderCount = activeOrders.length;
+                lastOrderCount = orders.length;
                 
-                if (activeOrders.length === 0) {
+                if (orders.length === 0) {
                     if (noOrdersMsg) noOrdersMsg.style.display = 'block';
                 } else if (container) {
-                    container.innerHTML = activeOrders.map((order, index) => `
+                    container.innerHTML = orders.map((order) => `
                         <div class="order-card">
                             <h3>Order #${order.id}</h3>
                             <div class="order-info">
@@ -1009,7 +1012,7 @@
                                 <strong>Name:</strong> ${order.name}<br>
                                 ${order.comments ? `<strong>Comments:</strong> ${order.comments}<br>` : ''}
                                 <strong>Time:</strong> ${order.timestamp}<br>
-                                <span class="status-badge status-${order.status}">${order.status.replace('-', ' ')}</span>
+                                <span class="status-badge status-${order.status}">${order.status.replace(/-/g, ' ')}</span>
                             </div>
                             <div class="status-controls">
                                 ${order.status === 'pending' ? `
@@ -1038,7 +1041,7 @@
         async function updateStatus(orderId, newStatus) {
             try {
                 await updateOrderStatus(orderId, newStatus);
-                showMessage('success', `Order #${orderId} updated to ${newStatus.replace('-', ' ')}`);
+                showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
                 loadOrders();
                 loadRecentOrders();
             } catch (error) {
@@ -1093,7 +1096,8 @@
                         <p><strong>Name:</strong> ${order.name}</p>
                         ${order.comments ? `<p><strong>Comments:</strong> ${order.comments}</p>` : ''}
                         <p><strong>Order Time:</strong> ${order.timestamp}</p>
-                        <p><strong>Current Status:</strong> <span class="status-badge status-${order.status}">${order.status.replace('-', ' ')}</span></p>
+                        <p><strong>Current Status:</strong> <span class="status-badge status-${order.status}">${order.status.replace(/-/g, ' ')}</span></p>
+                        ${order.completedAt ? `<p><strong>Completed At:</strong> ${order.completedAt}</p>` : ''}
                     `;
                 }
 
@@ -1133,25 +1137,20 @@
             if (!recentContainer) return;
 
             try {
-                const response = await getOrders();
-                const allOrders = response.orders || [];
-                
-                // Show recent orders (both completed and active, sorted by timestamp)
-                const recentOrders = allOrders
-                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                    .slice(0, 10);
+                const response = await getRecentOrders();
+                const recentOrders = response.orders || [];
 
                 if (recentOrders.length === 0) {
                     recentContainer.innerHTML = '<p style="color: #666; text-align: center;">No orders yet.</p>';
                 } else {
                     recentContainer.innerHTML = recentOrders
                         .map(order => `
-                            <div class="completed-order ${order.status === 'completed' ? '' : 'active-order'}" style="${order.status !== 'completed' ? 'background: #e3f2fd; border-color: #90caf9;' : ''}">
+                            <div class="completed-order ${order.isActive ? 'active-order' : ''}">
                                 <h4>Order #${order.id}</h4>
                                 <p><strong>Food:</strong> ${order.food}</p>
                                 <p><strong>Customer:</strong> ${order.name}</p>
                                 <p><strong>Room:</strong> ${order.room}</p>
-                                <p><strong>Status:</strong> <span class="status-badge status-${order.status}" style="display: inline; padding: 2px 8px; font-size: 0.8em;">${order.status.replace('-', ' ')}</span></p>
+                                <p><strong>Status:</strong> <span class="status-badge status-${order.status}" style="display: inline; padding: 2px 8px; font-size: 0.8em;">${order.status.replace(/-/g, ' ')}</span></p>
                                 <p><strong>Time:</strong> ${order.timestamp}</p>
                                 ${order.completedAt ? `<p><strong>Completed:</strong> ${order.completedAt}</p>` : ''}
                             </div>
