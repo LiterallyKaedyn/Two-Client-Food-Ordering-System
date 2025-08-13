@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1400px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -47,8 +47,23 @@
             opacity: 0.9;
         }
 
+        .main-layout {
+            display: flex;
+            min-height: 60vh;
+        }
+
         .content {
+            flex: 2;
             padding: 40px;
+        }
+
+        .sidebar {
+            flex: 1;
+            background: #f8f9fa;
+            border-left: 2px solid #e9ecef;
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .page {
@@ -77,7 +92,7 @@
             font-size: 1.1em;
         }
 
-        .form-group input {
+        .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 15px;
             border: 2px solid #e9ecef;
@@ -85,9 +100,15 @@
             font-size: 1em;
             transition: all 0.3s ease;
             background: #f8f9fa;
+            font-family: inherit;
         }
 
-        .form-group input:focus {
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
             outline: none;
             border-color: #4ecdc4;
             background: white;
@@ -124,7 +145,7 @@
         .orders-container {
             display: grid;
             gap: 20px;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
         }
 
         .order-card {
@@ -174,6 +195,49 @@
 
         .order-info strong {
             color: #ffd700;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 10px;
+        }
+
+        .status-pending { background: #ffc107; color: #000; }
+        .status-accepted { background: #17a2b8; color: white; }
+        .status-being-made { background: #fd7e14; color: white; }
+        .status-being-delivered { background: #6610f2; color: white; }
+        .status-completed { background: #28a745; color: white; }
+
+        .status-controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .status-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
         }
 
         .no-orders {
@@ -270,7 +334,6 @@
             color: #666;
         }
 
-        /* Hide manager access from order page */
         .manager-access {
             position: fixed;
             bottom: 10px;
@@ -302,13 +365,117 @@
             100% { transform: scale(1); }
         }
 
-        @media (max-width: 600px) {
+        .sidebar h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+
+        .completed-order {
+            background: #e9f7ef;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .completed-order h4 {
+            color: #155724;
+            margin-bottom: 8px;
+        }
+
+        .completed-order p {
+            margin: 5px 0;
+            color: #155724;
+        }
+
+        .order-tracking {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .order-id-display {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+        }
+
+        .order-id-display h2 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .order-details-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .status-timeline {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .timeline-step {
+            text-align: center;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .timeline-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            background: #dee2e6;
+        }
+
+        .timeline-step.active .timeline-circle {
+            background: #28a745;
+        }
+
+        .timeline-step.completed .timeline-circle {
+            background: #6c757d;
+        }
+
+        @media (max-width: 768px) {
+            .main-layout {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                border-left: none;
+                border-top: 2px solid #e9ecef;
+                max-height: none;
+            }
+
             .content {
                 padding: 20px;
             }
 
             .orders-container {
                 grid-template-columns: 1fr;
+            }
+
+            .status-timeline {
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
             }
         }
     </style>
@@ -320,57 +487,129 @@
             <p id="headerSubtitle">Place your order</p>
         </div>
 
-        <div class="content">
-            <!-- Order Form Page -->
-            <div id="orderPage" class="page active">
-                <!-- Kitchen Closed Message -->
-                <div id="kitchenClosedMessage" class="kitchen-closed-message">
-                    <h2>🔴 Kitchen Closed</h2>
-                    <p>Nobody is available to complete your order at the moment.</p>
-                    <p>Please check back later when the kitchen reopens.</p>
+        <div class="main-layout">
+            <div class="content">
+                <!-- Order Form Page -->
+                <div id="orderPage" class="page active">
+                    <!-- Kitchen Closed Message -->
+                    <div id="kitchenClosedMessage" class="kitchen-closed-message">
+                        <h2>🔴 Kitchen Closed</h2>
+                        <p>Nobody is available to complete your order at the moment.</p>
+                        <p>Please check back later when the kitchen reopens.</p>
+                    </div>
+
+                    <!-- Order Form (hidden when kitchen closed) -->
+                    <div id="orderFormContainer">
+                        <div class="success-message" id="successMessage"></div>
+                        <div class="error-message" id="errorMessage"></div>
+                        
+                        <form id="orderForm">
+                            <div class="form-group">
+                                <label for="food">What food do you want:</label>
+                                <select id="food" name="food" required>
+                                    <option value="">Select a food item...</option>
+                                    <option value="Pizza Margherita">Pizza Margherita</option>
+                                    <option value="Pizza Pepperoni">Pizza Pepperoni</option>
+                                    <option value="Pizza Hawaiian">Pizza Hawaiian</option>
+                                    <option value="Chicken Sandwich">Chicken Sandwich</option>
+                                    <option value="Turkey Sandwich">Turkey Sandwich</option>
+                                    <option value="BLT Sandwich">BLT Sandwich</option>
+                                    <option value="Caesar Salad">Caesar Salad</option>
+                                    <option value="Garden Salad">Garden Salad</option>
+                                    <option value="Chicken Caesar Salad">Chicken Caesar Salad</option>
+                                    <option value="Fish & Chips">Fish & Chips</option>
+                                    <option value="Chicken Wings">Chicken Wings</option>
+                                    <option value="Burger & Fries">Burger & Fries</option>
+                                    <option value="Pasta Marinara">Pasta Marinara</option>
+                                    <option value="Pasta Alfredo">Pasta Alfredo</option>
+                                    <option value="Spaghetti Bolognese">Spaghetti Bolognese</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="comments">Special requests / Allergies (Optional):</label>
+                                <textarea id="comments" name="comments" placeholder="e.g., No onions, gluten-free, nut allergy, extra sauce, etc."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="room">What room are you in:</label>
+                                <input type="text" id="room" name="room" required placeholder="e.g., Room 101, Conference Room A...">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="name">What is your name:</label>
+                                <input type="text" id="name" name="name" required placeholder="Your full name">
+                            </div>
+                            
+                            <button type="submit" class="submit-btn" id="submitBtn">Place Order</button>
+                        </form>
+                    </div>
                 </div>
 
-                <!-- Order Form (hidden when kitchen closed) -->
-                <div id="orderFormContainer">
-                    <div class="success-message" id="successMessage"></div>
-                    <div class="error-message" id="errorMessage"></div>
-                    
-                    <form id="orderForm">
-                        <div class="form-group">
-                            <label for="food">What food do you want:</label>
-                            <input type="text" id="food" name="food" required placeholder="e.g., Pizza Margherita, Chicken Sandwich...">
+                <!-- Manager Page -->
+                <div id="managerPage" class="page">
+                    <div class="new-order-notification" id="newOrderNotification">
+                        🔔 New order received!
+                    </div>
+                    <div class="manager-controls">
+                        <button class="kitchen-status-btn" id="kitchenToggle" onclick="toggleKitchenStatus()">🔴 Kitchen Closed</button>
+                        <button class="refresh-btn" onclick="loadOrders()">🔄 Refresh Orders</button>
+                        <button class="clear-all-btn" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
+                    </div>
+                    <div class="loading" id="loading">Loading orders...</div>
+                    <div id="ordersContainer" class="orders-container"></div>
+                    <div id="noOrders" class="no-orders" style="display: none;">
+                        No orders yet! 📝<br>
+                        Orders will appear here as they are placed.
+                    </div>
+                </div>
+
+                <!-- Order Tracking Page -->
+                <div id="trackingPage" class="page">
+                    <div class="order-tracking">
+                        <div class="order-id-display">
+                            <h2 id="trackingOrderId">#001</h2>
+                            <p>Your Order</p>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="room">What room are you in:</label>
-                            <input type="text" id="room" name="room" required placeholder="e.g., Room 101, Conference Room A...">
+                        <div class="order-details-card" id="trackingOrderDetails">
+                            <div class="loading">Loading order details...</div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="name">What is your name:</label>
-                            <input type="text" id="name" name="name" required placeholder="Your full name">
+
+                        <div class="status-timeline">
+                            <div class="timeline-step" data-status="pending">
+                                <div class="timeline-circle">1</div>
+                                <p>Pending</p>
+                            </div>
+                            <div class="timeline-step" data-status="accepted">
+                                <div class="timeline-circle">2</div>
+                                <p>Accepted</p>
+                            </div>
+                            <div class="timeline-step" data-status="being-made">
+                                <div class="timeline-circle">3</div>
+                                <p>Being Made</p>
+                            </div>
+                            <div class="timeline-step" data-status="being-delivered">
+                                <div class="timeline-circle">4</div>
+                                <p>Being Delivered</p>
+                            </div>
+                            <div class="timeline-step" data-status="completed">
+                                <div class="timeline-circle">5</div>
+                                <p>Completed</p>
+                            </div>
                         </div>
-                        
-                        <button type="submit" class="submit-btn" id="submitBtn">Place Order</button>
-                    </form>
+
+                        <button onclick="goToOrderPage()" style="margin-top: 30px; padding: 15px 30px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 10px; cursor: pointer;">
+                            Place Another Order
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Manager Page -->
-            <div id="managerPage" class="page">
-                <div class="new-order-notification" id="newOrderNotification">
-                    🔔 New order received!
-                </div>
-                <div class="manager-controls">
-                    <button class="kitchen-status-btn" id="kitchenToggle" onclick="toggleKitchenStatus()">🔴 Kitchen Closed</button>
-                    <button class="refresh-btn" onclick="loadOrders()">🔄 Refresh Orders</button>
-                    <button class="clear-all-btn" onclick="clearAllOrders()">🗑️ Clear All Orders</button>
-                </div>
-                <div class="loading" id="loading">Loading orders...</div>
-                <div id="ordersContainer" class="orders-container"></div>
-                <div id="noOrders" class="no-orders" style="display: none;">
-                    No orders yet! 📝<br>
-                    Orders will appear here as they are placed.
+            <div class="sidebar">
+                <h3>Completed Orders</h3>
+                <div id="completedOrdersList">
+                    <div class="loading">Loading completed orders...</div>
                 </div>
             </div>
         </div>
@@ -380,28 +619,86 @@
     <a href="?page=manager" class="manager-access" id="managerAccess">Manager</a>
 
     <script>
-        const API_BASE = '/api';
+        const API_BASE = '';
 
-        // API functions
+        // Mock data storage (replace with actual API calls)
+        let mockData = {
+            orders: [],
+            completedOrders: [],
+            kitchenOpen: false,
+            nextOrderId: 1
+        };
+
+        // Utility functions
+        function getNZTime() {
+            return new Date().toLocaleString('en-NZ', {
+                timeZone: 'Pacific/Auckland',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        function generateOrderId() {
+            const id = mockData.nextOrderId.toString().padStart(3, '0');
+            mockData.nextOrderId++;
+            return id;
+        }
+
+        // API simulation functions
         async function apiCall(endpoint, options = {}) {
-            try {
-                const response = await fetch(`${API_BASE}${endpoint}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    },
-                    ...options
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            if (endpoint === '/orders') {
+                if (options.method === 'GET') {
+                    return { orders: mockData.orders };
+                } else if (options.method === 'POST') {
+                    const newOrder = {
+                        id: generateOrderId(),
+                        displayId: mockData.nextOrderId - 1,
+                        ...JSON.parse(options.body),
+                        timestamp: getNZTime(),
+                        status: 'pending'
+                    };
+                    mockData.orders.push(newOrder);
+                    return { message: 'Order created', order: newOrder };
+                } else if (options.method === 'DELETE') {
+                    mockData.orders = [];
+                    return { message: 'All orders cleared' };
                 }
-                
-                return await response.json();
-            } catch (error) {
-                console.error('API call failed:', error);
-                throw error;
+            } else if (endpoint.startsWith('/orders/')) {
+                const orderId = endpoint.split('/')[2];
+                const order = mockData.orders.find(o => o.id === orderId);
+                if (options.method === 'GET') {
+                    return { order };
+                } else if (options.method === 'PUT') {
+                    const updates = JSON.parse(options.body);
+                    Object.assign(order, updates);
+                    
+                    // If completed, move to completed orders
+                    if (updates.status === 'completed') {
+                        mockData.completedOrders.push({...order, completedAt: getNZTime()});
+                        mockData.orders = mockData.orders.filter(o => o.id !== orderId);
+                    }
+                    return { message: 'Order updated', order };
+                }
+            } else if (endpoint === '/kitchen-status') {
+                if (options.method === 'GET') {
+                    return { isOpen: mockData.kitchenOpen };
+                } else if (options.method === 'POST') {
+                    const { isOpen } = JSON.parse(options.body);
+                    mockData.kitchenOpen = isOpen;
+                    return { message: 'Kitchen status updated', isOpen };
+                }
+            } else if (endpoint === '/completed-orders') {
+                return { orders: mockData.completedOrders };
             }
+            
+            throw new Error('Not found');
         }
 
         async function getOrders() {
@@ -415,9 +712,14 @@
             });
         }
 
-        async function deleteOrder(id) {
-            return await apiCall(`/orders?id=${id}`, {
-                method: 'DELETE'
+        async function getOrder(id) {
+            return await apiCall(`/orders/${id}`);
+        }
+
+        async function updateOrderStatus(id, status) {
+            return await apiCall(`/orders/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ status })
             });
         }
 
@@ -438,20 +740,38 @@
             });
         }
 
+        async function getCompletedOrders() {
+            return await apiCall('/completed-orders');
+        }
+
         // UI Functions
         function showMessage(type, message, duration = 3000) {
             const messageEl = document.getElementById(`${type}Message`);
-            messageEl.textContent = message;
-            messageEl.style.display = 'block';
-            setTimeout(() => {
-                messageEl.style.display = 'none';
-            }, duration);
+            if (messageEl) {
+                messageEl.textContent = message;
+                messageEl.style.display = 'block';
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, duration);
+            }
         }
 
         function getCurrentPage() {
             const urlParams = new URLSearchParams(window.location.search);
             const page = urlParams.get('page');
+            const id = urlParams.get('id');
+            
+            if (id) return 'tracking';
             return page === 'manager' ? 'manager' : 'order';
+        }
+
+        function getOrderIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+
+        function goToOrderPage() {
+            window.location.href = window.location.pathname;
         }
 
         // Kitchen status management
@@ -470,12 +790,14 @@
 
         function updateKitchenButton() {
             const button = document.getElementById('kitchenToggle');
-            if (kitchenOpen) {
-                button.textContent = '🟢 Kitchen Open';
-                button.classList.remove('closed');
-            } else {
-                button.textContent = '🔴 Kitchen Closed';
-                button.classList.add('closed');
+            if (button) {
+                if (kitchenOpen) {
+                    button.textContent = '🟢 Kitchen Open';
+                    button.classList.remove('closed');
+                } else {
+                    button.textContent = '🔴 Kitchen Closed';
+                    button.classList.add('closed');
+                }
             }
         }
 
@@ -498,44 +820,47 @@
             const closedMessage = document.getElementById('kitchenClosedMessage');
             const formContainer = document.getElementById('orderFormContainer');
             
-            if (kitchenOpen) {
-                closedMessage.style.display = 'none';
-                formContainer.style.display = 'block';
-            } else {
-                closedMessage.style.display = 'block';
-                formContainer.style.display = 'none';
+            if (closedMessage && formContainer) {
+                if (kitchenOpen) {
+                    closedMessage.style.display = 'none';
+                    formContainer.style.display = 'block';
+                } else {
+                    closedMessage.style.display = 'block';
+                    formContainer.style.display = 'none';
+                }
             }
         }
 
-        // Smart refresh system - only refresh when there are changes
+        // Smart refresh system
         let lastOrderCount = 0;
         let refreshInterval;
         
         function startSmartRefresh() {
-            // Check for new orders every 5 seconds (less frequent than before)
             refreshInterval = setInterval(async () => {
                 if (getCurrentPage() === 'manager') {
                     try {
                         const response = await getOrders();
                         const currentOrderCount = response.orders ? response.orders.length : 0;
                         
-                        // Only refresh display if order count changed
                         if (currentOrderCount !== lastOrderCount) {
                             if (currentOrderCount > lastOrderCount) {
-                                // New order detected - show notification
                                 showNewOrderNotification();
                             }
                             lastOrderCount = currentOrderCount;
                             loadOrders();
                         }
+                        loadCompletedOrders();
                     } catch (error) {
                         console.error('Failed to check for new orders:', error);
                     }
                 } else if (getCurrentPage() === 'order') {
-                    // Only check kitchen status occasionally for order page
                     checkKitchenStatus();
+                    loadCompletedOrders();
+                } else if (getCurrentPage() === 'tracking') {
+                    loadOrderTracking();
+                    loadCompletedOrders();
                 }
-            }, 5000); // Check every 5 seconds instead of every 3
+            }, 3000);
         }
 
         function stopSmartRefresh() {
@@ -547,10 +872,12 @@
 
         function showNewOrderNotification() {
             const notification = document.getElementById('newOrderNotification');
-            notification.style.display = 'block';
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, 3000);
+            if (notification) {
+                notification.style.display = 'block';
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 3000);
+            }
         }
 
         function showPage(pageName) {
@@ -563,11 +890,7 @@
                 document.getElementById('headerSubtitle').textContent = 'Manage and complete food orders';
                 loadOrders();
                 checkKitchenStatus();
-                startSmartRefresh();
-            } else {
-                document.getElementById('orderPage').classList.add('active');
-                document.getElementById('headerSubtitle').textContent = 'Place your food order';
-                checkKitchenStatus();
+                loadCompletedOrders();
                 startSmartRefresh();
             }
         }
@@ -585,16 +908,18 @@
                 const order = {
                     food: formData.get('food'),
                     room: formData.get('room'),
-                    name: formData.get('name')
+                    name: formData.get('name'),
+                    comments: formData.get('comments') || ''
                 };
                 
-                await addOrder(order);
+                const response = await addOrder(order);
                 this.reset();
-                showMessage('success', 'Order placed successfully! 🎉');
+                
+                // Redirect to tracking page
+                window.location.href = `?id=${response.order.id}`;
                 
             } catch (error) {
                 showMessage('error', 'Failed to place order. Please try again.');
-            } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Place Order';
             }
@@ -606,44 +931,61 @@
             const container = document.getElementById('ordersContainer');
             const noOrdersMsg = document.getElementById('noOrders');
             
-            loading.style.display = 'block';
-            container.innerHTML = '';
-            noOrdersMsg.style.display = 'none';
+            if (loading) loading.style.display = 'block';
+            if (container) container.innerHTML = '';
+            if (noOrdersMsg) noOrdersMsg.style.display = 'none';
             
             try {
                 const response = await getOrders();
                 const orders = response.orders || [];
                 
-                loading.style.display = 'none';
-                lastOrderCount = orders.length; // Update tracked count
+                if (loading) loading.style.display = 'none';
+                lastOrderCount = orders.length;
                 
                 if (orders.length === 0) {
-                    noOrdersMsg.style.display = 'block';
-                } else {
+                    if (noOrdersMsg) noOrdersMsg.style.display = 'block';
+                } else if (container) {
                     container.innerHTML = orders.map((order, index) => `
-                        <div class="order-card" onclick="completeOrder('${order.id}')">
-                            <h3>Order #${index + 1}</h3>
+                        <div class="order-card">
+                            <h3>Order #${order.id}</h3>
                             <div class="order-info">
                                 <strong>Food:</strong> ${order.food}<br>
                                 <strong>Room:</strong> ${order.room}<br>
                                 <strong>Name:</strong> ${order.name}<br>
-                                <strong>Time:</strong> ${order.timestamp}
+                                ${order.comments ? `<strong>Comments:</strong> ${order.comments}<br>` : ''}
+                                <strong>Time:</strong> ${order.timestamp}<br>
+                                <span class="status-badge status-${order.status}">${order.status.replace('-', ' ')}</span>
+                            </div>
+                            <div class="status-controls">
+                                ${order.status === 'pending' ? `
+                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'accepted')">Accept</button>
+                                ` : ''}
+                                ${order.status === 'accepted' ? `
+                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'being-made')">Start Making</button>
+                                ` : ''}
+                                ${order.status === 'being-made' ? `
+                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'being-delivered')">Out for Delivery</button>
+                                ` : ''}
+                                ${order.status === 'being-delivered' ? `
+                                    <button class="status-btn" onclick="updateStatus('${order.id}', 'completed')">Complete</button>
+                                ` : ''}
                             </div>
                         </div>
                     `).join('');
                 }
             } catch (error) {
-                loading.style.display = 'none';
-                container.innerHTML = '<div class="error-message" style="display: block;">Failed to load orders. Please refresh.</div>';
+                if (loading) loading.style.display = 'none';
+                if (container) container.innerHTML = '<div class="error-message" style="display: block;">Failed to load orders. Please refresh.</div>';
             }
         }
 
-        async function completeOrder(orderId) {
+        async function updateStatus(orderId, newStatus) {
             try {
-                await deleteOrder(orderId);
+                await updateOrderStatus(orderId, newStatus);
                 loadOrders();
+                loadCompletedOrders();
             } catch (error) {
-                showMessage('error', 'Failed to complete order. Please try again.');
+                showMessage('error', 'Failed to update order status. Please try again.');
             }
         }
 
@@ -658,6 +1000,101 @@
             }
         }
 
+        // Order tracking functions
+        async function loadOrderTracking() {
+            const orderId = getOrderIdFromUrl();
+            if (!orderId) return;
+
+            const trackingOrderId = document.getElementById('trackingOrderId');
+            const trackingOrderDetails = document.getElementById('trackingOrderDetails');
+
+            if (trackingOrderId) trackingOrderId.textContent = `#${orderId}`;
+
+            try {
+                const response = await getOrder(orderId);
+                const order = response.order;
+
+                if (!order) {
+                    if (trackingOrderDetails) {
+                        trackingOrderDetails.innerHTML = `
+                            <div class="error-message" style="display: block;">
+                                Order not found. It may have been completed or cancelled.
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+
+                if (trackingOrderDetails) {
+                    trackingOrderDetails.innerHTML = `
+                        <h3>${order.food}</h3>
+                        <p><strong>Room:</strong> ${order.room}</p>
+                        <p><strong>Name:</strong> ${order.name}</p>
+                        ${order.comments ? `<p><strong>Comments:</strong> ${order.comments}</p>` : ''}
+                        <p><strong>Order Time:</strong> ${order.timestamp}</p>
+                        <p><strong>Current Status:</strong> <span class="status-badge status-${order.status}">${order.status.replace('-', ' ')}</span></p>
+                    `;
+                }
+
+                updateStatusTimeline(order.status);
+
+            } catch (error) {
+                if (trackingOrderDetails) {
+                    trackingOrderDetails.innerHTML = `
+                        <div class="error-message" style="display: block;">
+                            Failed to load order details. Please refresh the page.
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function updateStatusTimeline(currentStatus) {
+            const steps = ['pending', 'accepted', 'being-made', 'being-delivered', 'completed'];
+            const currentIndex = steps.indexOf(currentStatus);
+
+            document.querySelectorAll('.timeline-step').forEach((step, index) => {
+                const circle = step.querySelector('.timeline-circle');
+                step.classList.remove('active', 'completed');
+                
+                if (index < currentIndex) {
+                    step.classList.add('completed');
+                } else if (index === currentIndex) {
+                    step.classList.add('active');
+                }
+            });
+        }
+
+        // Completed orders functions
+        async function loadCompletedOrders() {
+            const completedContainer = document.getElementById('completedOrdersList');
+            if (!completedContainer) return;
+
+            try {
+                const response = await getCompletedOrders();
+                const completedOrders = response.orders || [];
+
+                if (completedOrders.length === 0) {
+                    completedContainer.innerHTML = '<p style="color: #666; text-align: center;">No completed orders yet.</p>';
+                } else {
+                    completedContainer.innerHTML = completedOrders
+                        .slice(-10) // Show last 10 completed orders
+                        .reverse() // Most recent first
+                        .map(order => `
+                            <div class="completed-order">
+                                <h4>Order #${order.id}</h4>
+                                <p><strong>Food:</strong> ${order.food}</p>
+                                <p><strong>Customer:</strong> ${order.name}</p>
+                                <p><strong>Room:</strong> ${order.room}</p>
+                                <p><strong>Completed:</strong> ${order.completedAt}</p>
+                            </div>
+                        `).join('');
+                }
+            } catch (error) {
+                completedContainer.innerHTML = '<p style="color: #dc3545;">Failed to load completed orders.</p>';
+            }
+        }
+
         // Show manager access link only on triple-click of header
         let clickCount = 0;
         document.querySelector('.header').addEventListener('click', function() {
@@ -667,9 +1104,9 @@
                 setTimeout(() => {
                     document.getElementById('managerAccess').style.display = 'none';
                     clickCount = 0;
-                }, 5000); // Hide after 5 seconds
+                }, 5000);
             }
-            setTimeout(() => { clickCount = 0; }, 1000); // Reset click count after 1 second
+            setTimeout(() => { clickCount = 0; }, 1000);
         });
 
         // Initialize
@@ -682,6 +1119,25 @@
         window.addEventListener('beforeunload', stopSmartRefresh);
         window.addEventListener('popstate', init);
         document.addEventListener('DOMContentLoaded', init);
+
+        // Initialize with some sample data for demonstration
+        mockData.completedOrders = [
+            {
+                id: '001',
+                food: 'Pizza Margherita',
+                name: 'John Smith',
+                room: 'Room 101',
+                completedAt: getNZTime()
+            },
+            {
+                id: '002', 
+                food: 'Chicken Sandwich',
+                name: 'Jane Doe',
+                room: 'Conference Room A',
+                completedAt: getNZTime()
+            }
+        ];
+        mockData.nextOrderId = 3;
     </script>
 </body>
 </html>
