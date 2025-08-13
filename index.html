@@ -672,12 +672,14 @@
             window.location.href = window.location.pathname;
         }
 
-        // Enhanced API functions with better error handling
+        // FIXED API FUNCTIONS - Updated URLs to match backend routes
         async function getOrders() {
             try {
+                console.log('Fetching orders from /api/orders');
                 const response = await fetch('/api/orders');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const orders = await response.json();
+                console.log('Orders received:', orders);
                 return { orders: Array.isArray(orders) ? orders : [] };
             } catch (error) {
                 console.error('Failed to get orders:', error);
@@ -731,6 +733,7 @@
                     updateData.completedAt = getNZTime();
                 }
 
+                console.log(`Updating order ${id} to status ${status}`);
                 const response = await fetch(`/api/orders/${id}`, {
                     method: 'PUT',
                     headers: {
@@ -742,6 +745,7 @@
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const result = await response.json();
+                console.log('Order status updated:', result);
                 return result;
             } catch (error) {
                 console.error('Failed to update order:', error);
@@ -751,6 +755,7 @@
 
         async function clearOrders() {
             try {
+                console.log('Clearing all orders');
                 const response = await fetch('/api/orders', {
                     method: 'POST',
                     headers: {
@@ -760,7 +765,9 @@
                 });
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return { message: 'All orders cleared' };
+                const result = await response.json();
+                console.log('Orders cleared:', result);
+                return result;
             } catch (error) {
                 console.error('Failed to clear orders:', error);
                 throw error;
@@ -769,9 +776,12 @@
 
         async function getKitchenStatus() {
             try {
-                const response = await fetch('/api/orders/kitchen-status');
+                console.log('Fetching kitchen status from /api/orders (kitchen-status)');
+                // The backend checks for 'kitchen-status' in the URL
+                const response = await fetch('/api/orders?kitchen-status=true');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const status = await response.json();
+                console.log('Kitchen status received:', status);
                 return status;
             } catch (error) {
                 console.error('Failed to get kitchen status:', error);
@@ -781,7 +791,9 @@
 
         async function setKitchenStatus(isOpen) {
             try {
-                const response = await fetch('/api/orders/kitchen-status', {
+                console.log('Setting kitchen status to:', isOpen);
+                // The backend checks for 'kitchen-status' in the URL
+                const response = await fetch('/api/orders?kitchen-status=true', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -790,7 +802,9 @@
                 });
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return { message: 'Kitchen status updated', isOpen };
+                const result = await response.json();
+                console.log('Kitchen status updated:', result);
+                return result;
             } catch (error) {
                 console.error('Failed to set kitchen status:', error);
                 throw error;
@@ -799,9 +813,12 @@
 
         async function getRecentOrders() {
             try {
-                const response = await fetch('/api/orders/completed-orders');
+                console.log('Fetching recent orders from /api/orders (completed-orders)');
+                // The backend checks for 'completed-orders' in the URL
+                const response = await fetch('/api/orders?completed-orders=true');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const orders = await response.json();
+                console.log('Recent orders received:', orders);
                 return { orders: Array.isArray(orders) ? orders : [] };
             } catch (error) {
                 console.error('Failed to get recent orders:', error);
