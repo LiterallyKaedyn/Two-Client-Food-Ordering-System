@@ -1,32 +1,5 @@
 // ============= api/orders.js (Vercel serverless function) =============
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
-
-const DATA_FILE = join(process.cwd(), 'orders.json');
-
-function readOrders() {
-    try {
-        if (!existsSync(DATA_FILE)) {
-            return [];
-        }
-        const data = readFileSync(DATA_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error reading orders:', error);
-        return [];
-    }
-}
-
-function writeOrders(orders) {
-    try {
-        writeFileSync(DATA_FILE, JSON.stringify(orders, null, 2));
-    } catch (error) {
-        console.error('Error writing orders:', error);
-        throw error;
-    }
-}
-
-export default function handler(req, res) {
+export default async function handler(req, res) {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
@@ -37,12 +10,16 @@ export default function handler(req, res) {
         return;
     }
 
-    try {
-        const orders = readOrders();
+    // Simple in-memory storage (resets on function cold starts)
+    // For persistent storage, you'd need a database like Vercel KV or external DB
+    if (!global.orders) {
+        global.orders = [];
+    }
 
+    try {
         switch (req.method) {
             case 'GET':
-                res.status(200).json({ orders });
+                res.status(200).json({ orders: global.orders });
                 break;
 
             case 'POST':
@@ -51,21 +28,19 @@ export default function handler(req, res) {
                     ...req.body,
                     timestamp: new Date().toLocaleString()
                 };
-                orders.push(newOrder);
-                writeOrders(orders);
+                global.orders.push(newOrder);
                 res.status(201).json({ message: 'Order created', order: newOrder });
                 break;
 
             case 'DELETE':
-                if (req.url.includes('/orders/') && req.url.split('/').length > 3) {
+                const { query } = req;
+                if (query.id) {
                     // Delete specific order
-                    const orderId = req.url.split('/')[3];
-                    const filteredOrders = orders.filter(order => order.id !== orderId);
-                    writeOrders(filteredOrders);
+                    global.orders = global.orders.filter(order => order.id !== query.id);
                     res.status(200).json({ message: 'Order deleted' });
                 } else {
                     // Clear all orders
-                    writeOrders([]);
+                    global.orders = [];
                     res.status(200).json({ message: 'All orders cleared' });
                 }
                 break;
