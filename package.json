@@ -1,9 +1,9 @@
 {
   "name": "food-order-system",
   "version": "1.0.0",
-  "description": "Multi-client food ordering system",
+  "description": "Multi-client food ordering system with Upstash Redis",
   "dependencies": {
-    "@vercel/kv": "^1.0.0"
+    "@upstash/redis": "^1.28.4"
   },
   "type": "module"
 }
