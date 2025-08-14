@@ -171,6 +171,8 @@
         events.forEach(eventType => {
             document.addEventListener(eventType, function() {
                 updateSessionActivity();
+                // Enable audio after first user interaction
+                enableAudioAfterUserGesture();
             }, { passive: true });
         });
         
@@ -382,36 +384,81 @@ FOOD_OPTIONS['New Food Item'] = {
     }
     
     // Enhanced sound notification system using uploaded bell sound
+    let audioContext = null;
+    let userHasInteracted = false;
+    
+    // Initialize audio context after user interaction
+    function initAudioContext() {
+        if (!audioContext && userHasInteracted) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                debugLog('🔊 Audio context initialized after user interaction');
+            } catch (error) {
+                debugLog('🔇 Could not initialize audio context:', error.message);
+            }
+        }
+    }
+    
+    // Enable audio after user interaction and update UI
+    function enableAudioAfterUserGesture() {
+        if (!userHasInteracted) {
+            userHasInteracted = true;
+            initAudioContext();
+            debugLog('🎯 User interaction detected - audio enabled');
+            
+            // Update test sound button if we're on manager page
+            const testButton = document.querySelector('button[onclick="testNotificationSound()"]');
+            if (testButton) {
+                testButton.innerHTML = '🔔 Test Sound (Ready)';
+                testButton.style.backgroundColor = '#28a745';
+            }
+        }
+    }
+    
     function playNewOrderSound() {
+        // Try to play the bell sound first
         try {
             const audio = new Audio('/assets/bell.mp3');
-            audio.volume = 0.7; // Set volume to 70%
+            audio.volume = 0.7;
             
-            // Play the sound
             const playPromise = audio.play();
             
             if (playPromise !== undefined) {
                 playPromise
                     .then(() => {
-                        debugLog('🔊 New order bell notification played');
+                        debugLog('🔔 Bell notification played successfully');
                     })
                     .catch(error => {
-                        debugLog('🔇 Could not play bell notification:', error.message);
-                        // Fallback to generated sound if file fails
+                        debugLog('🔇 Bell sound failed, trying fallback:', error.message);
                         playFallbackSound();
                     });
             }
         } catch (error) {
-            debugLog('🔇 Could not load bell sound file:', error.message);
-            // Fallback to generated sound
+            debugLog('🔇 Could not load bell sound, trying fallback:', error.message);
             playFallbackSound();
         }
     }
     
-    // Fallback sound generation if bell.mp3 fails
+    // Fallback sound generation with user interaction check
     function playFallbackSound() {
+        if (!userHasInteracted) {
+            debugLog('🔇 Cannot play fallback sound - no user interaction yet');
+            return;
+        }
+        
         try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (!audioContext) {
+                initAudioContext();
+            }
+            
+            if (!audioContext || audioContext.state !== 'running') {
+                debugLog('🔇 Audio context not available for fallback sound');
+                return;
+            }
+            
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
             
@@ -431,7 +478,7 @@ FOOD_OPTIONS['New Food Item'] = {
             
             debugLog('🔊 Fallback notification sound played');
         } catch (error) {
-            debugLog('🔇 Could not play any notification sound:', error.message);
+            debugLog('🔇 Could not play fallback sound:', error.message);
         }
     }
     
@@ -996,17 +1043,33 @@ FOOD_OPTIONS['New Food Item'] = {
     function showNewOrderNotification(orderCount = 1) {
         const notification = document.getElementById('newOrderNotification');
         if (notification) {
-            // Enhanced notification text
-            notification.innerHTML = `🔔 ${orderCount} new order${orderCount > 1 ? 's' : ''} received!`;
+            // Enhanced notification text with sound status
+            const soundStatus = userHasInteracted ? '🔔' : '🔇';
+            notification.innerHTML = `${soundStatus} ${orderCount} new order${orderCount > 1 ? 's' : ''} received!`;
             notification.style.display = 'block';
             notification.style.animation = 'pulse 1s infinite';
             notification.style.backgroundColor = '#28A745';
             notification.style.border = '3px solid #000';
             notification.style.fontWeight = '700';
             
+            // Add click to test sound if user hasn't interacted yet
+            if (!userHasInteracted) {
+                notification.style.cursor = 'pointer';
+                notification.title = 'Click to enable sound notifications';
+                notification.onclick = function() {
+                    enableAudioAfterUserGesture();
+                    playNewOrderSound(); // Test the sound
+                    this.onclick = null; // Remove click handler
+                    this.style.cursor = 'default';
+                    this.title = '';
+                };
+            }
+            
             setTimeout(() => {
                 notification.style.display = 'none';
                 notification.style.animation = '';
+                notification.onclick = null;
+                notification.style.cursor = 'default';
             }, 8000); // Show for 8 seconds
         }
     }
@@ -1456,12 +1519,27 @@ FOOD_OPTIONS['New Food Item'] = {
         }
     }
 
+    // Test sound function for managers
+    function testNotificationSound() {
+        if (!userHasInteracted) {
+            enableAudioAfterUserGesture();
+        }
+        
+        playNewOrderSound();
+        
+        // Show feedback
+        showMessage('success', userHasInteracted ? 
+            'Sound test played! 🔔' : 
+            'Sound enabled! Click anywhere to activate audio, then test again.', 3000);
+    }
+
     // Global function assignments for onclick handlers
     window.toggleKitchenStatus = toggleKitchenStatus;
     window.loadOrders = loadOrders;
     window.clearAllOrders = clearAllOrders;
     window.logoutManager = logoutManager;
     window.goToOrderPage = goToOrderPage;
+    window.testNotificationSound = testNotificationSound;
 
     // Enhanced cleanup and navigation handling
     window.addEventListener('beforeunload', function() {
@@ -1502,8 +1580,10 @@ FOOD_OPTIONS['New Food Item'] = {
             console.log('📱 Tracking page: 15 seconds (was 2 seconds)');
             console.log('📝 Order page: 1 minute (was 5 seconds)');
             console.log('🔔 Bell sound notifications enabled (/assets/bell.mp3)');
+            console.log('🎵 Audio requires user interaction (Chrome autoplay policy)');
             console.log('🍔 Enhanced food selection system enabled');
             console.log('🖱️ Triple-click header for direct manager authentication');
+            console.log('🎯 Click anywhere to enable audio notifications');
         }
     }, 1000);
     
