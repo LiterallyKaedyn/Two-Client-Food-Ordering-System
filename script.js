@@ -7,10 +7,10 @@
     // ========== RATE LIMITING SYSTEM ==========
     
     const RATE_LIMITS = {
-        maxRequestsPerMinute: 10, // Very conservative
-        maxRequestsPerHour: 100,  // Reduced further
+        maxRequestsPerMinute: 20, // Very conservative
+        maxRequestsPerHour: 200,  // Reduced further
         burstLimit: 3,            // Reduced burst limit
-        cooldownMs: 5000          // Longer cooldown
+        cooldownMs: 3000          // Longer cooldown
     };
     
     let requestTracker = {
