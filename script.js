@@ -1,5 +1,5 @@
 // script.js - Complete Food Ordering System
-// All application logic and authentication with enhanced real-time updates
+// Reduced request frequency with sound notifications
 
 (function() {
     'use strict';
@@ -168,7 +168,7 @@
             (performanceMetrics.averageResponseTime * (performanceMetrics.requests - 1) + responseTime) / performanceMetrics.requests;
         performanceMetrics.lastRequestTime = responseTime;
         
-        debugLog(`⚡ Upstash Response Time: ${responseTime.toFixed(2)}ms (Avg: ${performanceMetrics.averageResponseTime.toFixed(2)}ms)`);
+        debugLog(`⚡ Response Time: ${responseTime.toFixed(2)}ms (Avg: ${performanceMetrics.averageResponseTime.toFixed(2)}ms) | Total Requests: ${performanceMetrics.requests}`);
     }
 
     // Utility functions
@@ -214,13 +214,21 @@
         window.location.href = window.location.pathname;
     }
 
-    // Enhanced event-driven update system
+    // ========== REDUCED FREQUENCY UPDATE SYSTEM ==========
+    
     let lastDataHash = '';
     let lastOrderCount = 0;
     let updateCheckInterval;
     let lastTrackingOrderData = null;
     let lastKitchenStatus = null;
     let lastRecentOrdersHash = '';
+    
+    // MUCH LONGER intervals to reduce requests
+    const UPDATE_INTERVALS = {
+        manager: 20000,    // 20 seconds (was 3 seconds) 
+        tracking: 15000,   // 15 seconds (was 2 seconds)
+        order: 60000       // 1 minute (was 5 seconds)
+    };
     
     function calculateDataHash(orders, recentOrders, kitchenStatus) {
         const dataString = JSON.stringify({
@@ -232,6 +240,34 @@
         return btoa(dataString).slice(0, 20);
     }
     
+    // Enhanced sound notification system
+    function playNewOrderSound() {
+        try {
+            // Create a more pleasant notification sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Pleasant notification melody
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+            
+            debugLog('🔊 New order notification sound played');
+        } catch (error) {
+            debugLog('🔇 Could not play notification sound:', error.message);
+        }
+    }
+    
     function startEventDrivenUpdates() {
         // Clear any existing interval
         if (updateCheckInterval) {
@@ -239,26 +275,49 @@
         }
         
         const currentPage = getCurrentPage();
-        // Set different intervals based on page for optimal performance
-        const intervalTime = currentPage === 'tracking' ? 2000 : 
-                           currentPage === 'manager' ? 3000 : 5000;
+        const intervalTime = UPDATE_INTERVALS[currentPage] || 60000;
         
-        debugLog(`[REAL-TIME] Starting updates for ${currentPage} page (${intervalTime}ms interval)`);
+        debugLog(`🕒 Starting reduced-frequency updates for ${currentPage} page (${intervalTime}ms interval)`);
         
         updateCheckInterval = setInterval(async () => {
-            if (document.hidden) return; // Don't update when tab is hidden
+            // Skip if tab is hidden to save requests
+            if (document.hidden) {
+                debugLog('📴 Tab hidden, skipping update');
+                return;
+            }
             
             const startTime = performance.now();
             
             try {
                 const currentPage = getCurrentPage();
                 
-                // Fetch all data in parallel for efficiency
-                const [ordersResp, recentResp, kitchenResp] = await Promise.all([
-                    fetch('/api/orders').then(r => r.json()).catch(() => []),
-                    fetch('/api/orders?completed-orders=true').then(r => r.json()).catch(() => []),
-                    fetch('/api/orders?kitchen-status=true').then(r => r.json()).catch(() => ({ isOpen: false }))
-                ]);
+                // Batch requests efficiently - only get what we need
+                const requestPromises = [];
+                
+                // Always get orders for any page type
+                requestPromises.push(
+                    fetch('/api/orders').then(r => r.json()).catch(() => [])
+                );
+                
+                // Get recent orders (less frequently)
+                if (Math.random() < 0.5) { // Only 50% of the time
+                    requestPromises.push(
+                        fetch('/api/orders?completed-orders=true').then(r => r.json()).catch(() => [])
+                    );
+                } else {
+                    requestPromises.push(Promise.resolve([]));
+                }
+                
+                // Get kitchen status only for manager/order pages
+                if (currentPage === 'manager' || currentPage === 'order') {
+                    requestPromises.push(
+                        fetch('/api/orders?kitchen-status=true').then(r => r.json()).catch(() => ({ isOpen: false }))
+                    );
+                } else {
+                    requestPromises.push(Promise.resolve({ isOpen: kitchenOpen }));
+                }
+                
+                const [ordersResp, recentResp, kitchenResp] = await Promise.all(requestPromises);
                 
                 trackPerformance(startTime);
                 
@@ -267,16 +326,16 @@
                 let hasChanges = false;
                 let shouldForceRefresh = false;
                 
-                // Kitchen status change detection with immediate refresh
+                // Kitchen status change detection
                 if (lastKitchenStatus !== null && kitchenResp.isOpen !== lastKitchenStatus) {
-                    debugLog(`[REAL-TIME] 🔄 Kitchen status changed: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
+                    debugLog(`🔄 Kitchen status changed: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
                     kitchenOpen = kitchenResp.isOpen;
                     shouldForceRefresh = true;
                     
-                    // Update all relevant UI components immediately
+                    // Update relevant UI components
                     if (currentPage === 'manager') {
                         updateKitchenButton();
-                        await loadOrders(); // Force refresh manager orders
+                        await loadOrders();
                     } else if (currentPage === 'order') {
                         updateOrderPageDisplay();
                     }
@@ -286,11 +345,16 @@
                 }
                 lastKitchenStatus = kitchenResp.isOpen;
                 
-                // Order count change detection with new order notification
+                // NEW ORDER DETECTION WITH SOUND
                 if (lastOrderCount > 0 && ordersResp.length > lastOrderCount && currentPage === 'manager') {
                     const newOrdersCount = ordersResp.length - lastOrderCount;
-                    debugLog(`[REAL-TIME] 🔔 New orders detected: ${lastOrderCount} → ${ordersResp.length} (+${newOrdersCount})`);
-                    showNewOrderNotification();
+                    debugLog(`🔔 NEW ORDERS DETECTED: ${lastOrderCount} → ${ordersResp.length} (+${newOrdersCount})`);
+                    
+                    // Play sound notification
+                    playNewOrderSound();
+                    
+                    // Show enhanced notification
+                    showNewOrderNotification(newOrdersCount);
                     shouldForceRefresh = true;
                     hasChanges = true;
                 }
@@ -298,7 +362,7 @@
                 
                 // Order status changes detection
                 if (currentHash !== lastDataHash && lastDataHash !== '') {
-                    debugLog(`[REAL-TIME] 📊 Data changes detected, forcing refresh`);
+                    debugLog(`📊 Data changes detected, refreshing UI`);
                     shouldForceRefresh = true;
                     hasChanges = true;
                 }
@@ -314,7 +378,7 @@
                         'not-found';
                     
                     if (lastTrackingOrderData && currentOrderData !== lastTrackingOrderData) {
-                        debugLog(`[REAL-TIME] 📱 Tracked order ${trackingOrderId} changed, updating immediately`);
+                        debugLog(`📱 Tracked order ${trackingOrderId} changed, updating`);
                         await loadOrderTracking();
                         hasChanges = true;
                     }
@@ -322,13 +386,13 @@
                     lastTrackingOrderData = currentOrderData;
                 }
                 
-                // Force refresh manager portal on any significant change
+                // Force refresh manager portal on significant changes
                 if (shouldForceRefresh && currentPage === 'manager') {
-                    debugLog(`[REAL-TIME] 🔄 Force refreshing manager portal`);
+                    debugLog(`🔄 Force refreshing manager portal`);
                     await loadOrders();
                 }
                 
-                // Always update recent orders if there are changes
+                // Update recent orders if there are changes
                 if (hasChanges) {
                     await loadRecentOrders();
                 }
@@ -336,11 +400,11 @@
                 lastDataHash = currentHash;
                 
                 if (hasChanges) {
-                    debugLog(`[REAL-TIME] ✅ Changes processed for ${currentPage} page`);
+                    debugLog(`✅ Changes processed for ${currentPage} page`);
                 }
                 
             } catch (error) {
-                debugLog('[REAL-TIME] ❌ Update error:', error.message);
+                debugLog('❌ Update error:', error.message);
             }
         }, intervalTime);
     }
@@ -349,41 +413,38 @@
         if (updateCheckInterval) {
             clearInterval(updateCheckInterval);
             updateCheckInterval = null;
-            debugLog('[REAL-TIME] Updates stopped');
+            debugLog('🛑 Updates stopped');
         }
     }
 
     // Enhanced update triggers with forced refreshes
     async function triggerUIUpdate(action, data = {}) {
         const currentPage = getCurrentPage();
-        debugLog(`[TRIGGER] 🚀 ${action} - forcing immediate UI update`);
+        debugLog(`🚀 ${action} - forcing immediate UI update`);
         
         try {
             switch (action) {
                 case 'ORDER_PLACED':
                     await loadRecentOrders();
                     if (currentPage === 'manager') {
-                        await loadOrders(); // Refresh manager to show new order
+                        await loadOrders();
                     }
                     break;
                     
                 case 'ORDER_STATUS_UPDATED':
-                    // Force refresh manager portal
                     if (currentPage === 'manager') {
                         await loadOrders();
                     }
                     await loadRecentOrders();
                     
-                    // Update tracking page if viewing this order
                     if (currentPage === 'tracking') {
                         const trackingOrderId = getOrderIdFromUrl();
                         if (trackingOrderId === data.orderId) {
-                            debugLog(`[TRIGGER] 📱 Immediately refreshing tracking page for order ${data.orderId}`);
+                            debugLog(`📱 Immediately refreshing tracking page for order ${data.orderId}`);
                             await loadOrderTracking();
                         }
                     }
                     
-                    // Update cached tracking data
                     if (data.orderId) {
                         lastTrackingOrderData = `${data.orderId}-${data.newStatus}-${new Date().getTime()}`;
                     }
@@ -392,33 +453,30 @@
                 case 'KITCHEN_STATUS_CHANGED':
                     kitchenOpen = data.isOpen;
                     
-                    // Update all pages immediately
                     if (currentPage === 'manager') {
                         updateKitchenButton();
-                        await loadOrders(); // Refresh orders in case status affects display
+                        await loadOrders();
                     } else if (currentPage === 'order') {
                         updateOrderPageDisplay();
                     }
                     
                     showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 2000);
-                    debugLog(`[TRIGGER] 🏪 Kitchen status updated to: ${data.isOpen}`);
+                    debugLog(`🏪 Kitchen status updated to: ${data.isOpen}`);
                     break;
                     
                 case 'ORDERS_CLEARED':
-                    // Force refresh all views
                     if (currentPage === 'manager') {
                         await loadOrders();
                     }
                     await loadRecentOrders();
                     
                     if (currentPage === 'tracking') {
-                        debugLog(`[TRIGGER] 🗑️ Orders cleared, updating tracking page`);
+                        debugLog(`🗑️ Orders cleared, updating tracking page`);
                         await loadOrderTracking();
                     }
                     break;
                     
                 case 'ORDER_DELETED':
-                    // Force refresh manager portal
                     if (currentPage === 'manager') {
                         await loadOrders();
                     }
@@ -427,7 +485,7 @@
                     if (currentPage === 'tracking') {
                         const trackingOrderId = getOrderIdFromUrl();
                         if (trackingOrderId === data.orderId) {
-                            debugLog(`[TRIGGER] 🗑️ Order ${data.orderId} deleted, showing message on tracking page`);
+                            debugLog(`🗑️ Order ${data.orderId} deleted, showing message on tracking page`);
                             const trackingOrderDetails = document.getElementById('trackingOrderDetails');
                             if (trackingOrderDetails) {
                                 trackingOrderDetails.innerHTML = `
@@ -441,7 +499,7 @@
                     break;
             }
         } catch (error) {
-            debugLog(`[TRIGGER] ❌ Error in ${action}:`, error.message);
+            debugLog(`❌ Error in ${action}:`, error.message);
         }
     }
 
@@ -768,21 +826,21 @@
         }
     }
 
-    function showNewOrderNotification() {
+    function showNewOrderNotification(orderCount = 1) {
         const notification = document.getElementById('newOrderNotification');
         if (notification) {
+            // Enhanced notification text
+            notification.innerHTML = `🔔 ${orderCount} new order${orderCount > 1 ? 's' : ''} received!`;
             notification.style.display = 'block';
-            
-            try {
-                new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhDjWCyPPPfTIGHm7A7+OZSA0NVqzn77NdGAg+ltryxnkpBSl+zPLaizsIGGS57OOYTgwOUarm7bliFg06kdDzyn0vBSF0xe/glEILElyx6OyrWBUIQ5zd8sFuIAU2jdXzzn1uBiJ0xe/glEILElyx6OyrWBUIQ5zd8sFuIAU2jdXzzn1uBg==').play().catch(() => {});
-            } catch (e) {}
-            
-            notification.style.animation = 'pulse 0.5s infinite';
+            notification.style.animation = 'pulse 1s infinite';
+            notification.style.backgroundColor = '#28A745';
+            notification.style.border = '3px solid #000';
+            notification.style.fontWeight = '700';
             
             setTimeout(() => {
                 notification.style.display = 'none';
                 notification.style.animation = '';
-            }, 5000);
+            }, 8000); // Show for 8 seconds
         }
     }
 
@@ -1096,7 +1154,7 @@
         
         showPage(currentPage);
         
-        debugLog(`[INIT] Application initialized on ${currentPage} page with enhanced real-time updates`);
+        debugLog(`[INIT] Application initialized on ${currentPage} page with reduced-frequency updates`);
     }
 
     // Enhanced Event Listeners
@@ -1148,7 +1206,7 @@
             });
         }
 
-        // Enhanced manager access functionality - Fixed triple click detection
+        // FIXED: Triple click detection for manager access
         let clickCount = 0;
         let clickTimer = null;
         const header = document.querySelector('.header');
@@ -1167,18 +1225,25 @@
                     const managerLink = document.getElementById('managerAccess');
                     if (managerLink) {
                         managerLink.style.display = 'block';
+                        managerLink.style.opacity = '1';
+                        managerLink.style.transition = 'opacity 0.3s ease';
                         
-                        // Hide after 5 seconds
+                        // Hide after 10 seconds
                         setTimeout(() => {
-                            managerLink.style.display = 'none';
-                        }, 5000);
+                            if (managerLink.style.display === 'block') {
+                                managerLink.style.opacity = '0';
+                                setTimeout(() => {
+                                    managerLink.style.display = 'none';
+                                }, 300);
+                            }
+                        }, 10000);
                     }
                     clickCount = 0; // Reset immediately
                 } else {
-                    // Set timer to reset click count after 1 second
+                    // Set timer to reset click count after 800ms
                     clickTimer = setTimeout(() => {
                         clickCount = 0;
-                    }, 1000);
+                    }, 800);
                 }
             });
         }
@@ -1236,19 +1301,31 @@
         }
     });
     
+    // Show performance info on page load
+    setTimeout(() => {
+        if (DEBUG_MODE) {
+            console.log('📊 Request Reduction Summary:');
+            console.log('🕒 Update Intervals:', UPDATE_INTERVALS);
+            console.log('🔄 Manager page: 20 seconds (was 3 seconds)');
+            console.log('📱 Tracking page: 15 seconds (was 2 seconds)');
+            console.log('📝 Order page: 1 minute (was 5 seconds)');
+            console.log('🔊 Sound notifications enabled for new orders');
+        }
+    }, 1000);
+    
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             setupActivityTracking();
             setupEventListeners();
             init();
-            debugLog('[STARTUP] Application fully loaded and initialized');
+            debugLog('[STARTUP] Application fully loaded with reduced-frequency updates and sound notifications');
         });
     } else {
         setupActivityTracking();
         setupEventListeners();
         init();
-        debugLog('[STARTUP] Application fully loaded and initialized');
+        debugLog('[STARTUP] Application fully loaded with reduced-frequency updates and sound notifications');
     }
 
 })();
