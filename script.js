@@ -290,7 +290,7 @@ FOOD_OPTIONS['New Food Item'] = {
     // ========== MAIN APPLICATION ==========
     
     // Enhanced debug mode with performance tracking
-    const DEBUG_MODE = true;
+    const DEBUG_MODE = false;
     let performanceMetrics = {
         requests: 0,
         averageResponseTime: 0,
