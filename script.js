@@ -1079,12 +1079,16 @@ FOOD_OPTIONS['New Food Item'] = {
             const previousStatus = kitchenOpen;
             kitchenOpen = !kitchenOpen;
             
+            // Update button immediately for better UX
+            updateKitchenButton();
+            
             await setKitchenStatus(kitchenOpen);
             
             debugLog(`[KITCHEN] Status changed from ${previousStatus} to ${kitchenOpen} - real-time updates will handle UI refresh`);
             
         } catch (error) {
             console.error('Failed to update kitchen status:', error.message);
+            // Revert on error
             kitchenOpen = !kitchenOpen;
             updateKitchenButton();
             updateOrderPageDisplay();
