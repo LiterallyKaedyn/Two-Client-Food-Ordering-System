@@ -1,4 +1,4 @@
-// api/orders.js - Upstash Redis version (Unlimited requests + Ultra fast)
+// api/orders.js - Enhanced with Server-Sent Events for real-time updates
 import { Redis } from '@upstash/redis';
 
 export default async function handler(req, res) {
@@ -28,6 +28,28 @@ export default async function handler(req, res) {
     
     // Redis keys
     const DATA_KEY = 'food_order_data';
+    const EVENTS_KEY = 'food_order_events';
+
+    // Helper to broadcast events to all connected clients
+    async function broadcastEvent(eventType, data = {}) {
+      try {
+        const event = {
+          type: eventType,
+          data,
+          timestamp: new Date().toISOString(),
+          id: Math.random().toString(36).substr(2, 9)
+        };
+        
+        // Store event in Redis with expiration
+        await redis.lpush(EVENTS_KEY, JSON.stringify(event));
+        await redis.expire(EVENTS_KEY, 300); // Keep events for 5 minutes
+        await redis.ltrim(EVENTS_KEY, 0, 99); // Keep only last 100 events
+        
+        console.log(`[BROADCAST] Event sent: ${eventType}`, data);
+      } catch (error) {
+        console.error('[BROADCAST] Failed to send event:', error);
+      }
+    }
 
     // Helper to get data from Upstash Redis
     async function getCurrentData() {
@@ -133,6 +155,74 @@ export default async function handler(req, res) {
       return nextId.toString().padStart(3, '0');
     }
 
+    // ========== NEW: SERVER-SENT EVENTS ENDPOINT ==========
+    
+    if (pathname === '/api/events') {
+      console.log('[SSE] Setting up Server-Sent Events connection');
+      
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+      
+      // Send initial connection event
+      res.write(`data: ${JSON.stringify({
+        type: 'connected',
+        timestamp: new Date().toISOString(),
+        message: 'Real-time updates connected'
+      })}\n\n`);
+      
+      // Keep connection alive and check for events
+      const eventChecker = setInterval(async () => {
+        try {
+          // Get recent events from Redis
+          const events = await redis.lrange(EVENTS_KEY, 0, 9); // Get last 10 events
+          
+          if (events && events.length > 0) {
+            // Send each event
+            for (const eventStr of events) {
+              try {
+                const event = JSON.parse(eventStr);
+                res.write(`data: ${JSON.stringify(event)}\n\n`);
+              } catch (e) {
+                console.error('[SSE] Failed to parse event:', e);
+              }
+            }
+            
+            // Clear sent events
+            await redis.del(EVENTS_KEY);
+          }
+          
+          // Send heartbeat every 30 seconds
+          if (Date.now() % 30000 < 2000) {
+            res.write(`data: ${JSON.stringify({
+              type: 'heartbeat',
+              timestamp: new Date().toISOString()
+            })}\n\n`);
+          }
+          
+        } catch (error) {
+          console.error('[SSE] Event checker error:', error);
+        }
+      }, 2000); // Check every 2 seconds
+      
+      // Clean up on client disconnect
+      req.on('close', () => {
+        console.log('[SSE] Client disconnected');
+        clearInterval(eventChecker);
+      });
+      
+      req.on('error', () => {
+        console.log('[SSE] Client connection error');
+        clearInterval(eventChecker);
+      });
+      
+      // Don't end the response - keep connection open
+      return;
+    }
+
     // ========== ROUTES ==========
     
     // Only handle /api/orders path
@@ -168,12 +258,22 @@ export default async function handler(req, res) {
           const data = await getCurrentData();
           console.log('[API] Kitchen status POST - current data loaded');
           
+          const previousStatus = data.kitchenOpen;
+          
           // Update kitchen status only
           data.kitchenOpen = Boolean(body.isOpen);
           console.log(`[API] Kitchen status POST - updating to: ${data.kitchenOpen}`);
           
           await saveData(data);
           console.log('[API] Kitchen status POST - data saved successfully to Redis');
+
+          // Broadcast kitchen status change event
+          if (previousStatus !== data.kitchenOpen) {
+            await broadcastEvent('KITCHEN_STATUS_CHANGED', {
+              isOpen: data.kitchenOpen,
+              previousStatus
+            });
+          }
 
           return res.status(200).json({ 
             success: true, 
@@ -239,6 +339,8 @@ export default async function handler(req, res) {
             return res.status(404).json({ error: 'Order not found' });
           }
           
+          const previousStatus = data.orders[orderIndex].status;
+          
           // Update order
           data.orders[orderIndex] = { ...data.orders[orderIndex], ...body };
           
@@ -266,6 +368,16 @@ export default async function handler(req, res) {
           }
           
           await saveData(data);
+          
+          // Broadcast order status update event
+          await broadcastEvent('ORDER_STATUS_UPDATED', {
+            orderId,
+            newStatus: body.status,
+            previousStatus,
+            order: body.status === 'completed' ? 
+              data.completedOrders[data.completedOrders.length - 1] : 
+              data.orders[orderIndex] || data.orders.find(o => o.id === orderId)
+          });
           
           console.log(`[API] Order ${orderId} updated successfully to status: ${body.status}`);
           return res.status(200).json({
@@ -307,6 +419,16 @@ export default async function handler(req, res) {
           data.orders.splice(orderIndex, 1);
           
           await saveData(data);
+          
+          // Broadcast order deletion event
+          await broadcastEvent('ORDER_DELETED', {
+            orderId,
+            deletedOrder: {
+              id: deletedOrder.id,
+              food: deletedOrder.food,
+              customer: deletedOrder.name
+            }
+          });
           
           console.log(`[API] Order ${orderId} deleted permanently`);
           return res.status(200).json({
@@ -376,6 +498,11 @@ export default async function handler(req, res) {
             data.orders = [];
             await saveData(data);
             
+            // Broadcast orders cleared event
+            await broadcastEvent('ORDERS_CLEARED', {
+              clearedCount: activeOrders.length
+            });
+            
             return res.status(200).json({ 
               success: true, 
               message: 'All orders cleared'
@@ -409,6 +536,12 @@ export default async function handler(req, res) {
             data.nextOrderId += 1;
             
             await saveData(data);
+
+            // Broadcast new order event
+            await broadcastEvent('NEW_ORDER', {
+              order: newOrder,
+              totalOrders: data.orders.length
+            });
 
             console.log(`[API] Order ${orderId} created successfully`);
             return res.status(201).json({ 

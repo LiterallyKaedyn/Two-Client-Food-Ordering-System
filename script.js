@@ -1,49 +1,51 @@
-// script.js - Complete Food Ordering System with Enhanced Food Selection
-// Reduced request frequency with sound notifications and dynamic food options
+// script.js - Enhanced Food Ordering System with Real-time Updates via SSE
+// Food options configuration at the top for easy editing
+
+// ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
+
+// Easy-to-edit food configuration
+const FOOD_OPTIONS = {
+    'Coco Pops': {
+        type: 'single',
+        label: 'Milk Type',
+        options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
+    },
+    'Cornflakes': {
+        type: 'single',
+        label: 'Milk Type',
+        options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
+    },
+    'Toast': {
+        type: 'single',
+        label: 'Spread (with optional margarine)',
+        options: ['Jam + Margarine', 'Jam (no margarine)', 'Nutella + Margarine', 'Nutella (no margarine)', 'Marmite + Margarine', 'Marmite (no margarine)', 'Just Margarine']
+    },
+    'Nachos': {
+        type: 'single',
+        label: 'Type',
+        options: ['Vegan Nachos', 'Beef Nachos']
+    },
+    'Chicken Wraps': {
+        type: 'multiple',
+        label: 'Sauces (select all that apply)',
+        options: ['Sweet Chilli', 'Mayo', 'Tomato Sauce', 'Barbecue Sauce']
+    },
+    'Ice Cream': {
+        type: 'single',
+        label: 'Flavour',
+        options: ['Vanilla', 'Chocolate']
+    },
+    'Fruit': {
+        type: 'single',
+        label: 'Type of Fruit',
+        options: ['Banana', 'Orange', 'Apple', 'Pear', 'Grapes']
+    }
+};
+
+// ========== MAIN APPLICATION ==========
 
 (function() {
     'use strict';
-    
-    // ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
-    
-    // Easy-to-edit food configuration
-    const FOOD_OPTIONS = {
-        'Coco Pops': {
-            type: 'single',
-            label: 'Milk Type',
-            options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
-        },
-        'Cornflakes': {
-            type: 'single',
-            label: 'Milk Type',
-            options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
-        },
-        'Toast': {
-            type: 'single',
-            label: 'Spread (with optional margarine)',
-            options: ['Jam + Margarine', 'Jam (no margarine)', 'Nutella + Margarine', 'Nutella (no margarine)', 'Marmite + Margarine', 'Marmite (no margarine)', 'Just Margarine']
-        },
-        'Nachos': {
-            type: 'single',
-            label: 'Type',
-            options: ['Vegan Nachos', 'Beef Nachos']
-        },
-        'Chicken Wraps': {
-            type: 'multiple',
-            label: 'Sauces (select all that apply)',
-            options: ['Sweet Chilli', 'Mayo', 'Tomato Sauce', 'Barbecue Sauce']
-        },
-        'Ice Cream': {
-            type: 'single',
-            label: 'Flavour',
-            options: ['Vanilla', 'Chocolate']
-        },
-        'Fruit': {
-            type: 'single',
-            label: 'Type of Fruit',
-            options: ['Banana', 'Orange', 'Apple', 'Pear', 'Grapes']
-        }
-    };
     
     // ========== AUTHENTICATION SYSTEM ==========
     
@@ -287,7 +289,176 @@ FOOD_OPTIONS['New Food Item'] = {
         `);
     }
     
-    // ========== MAIN APPLICATION ==========
+    // ========== REAL-TIME UPDATES SYSTEM ==========
+    
+    // Server-Sent Events connection for real-time updates
+    let eventSource = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_DELAY = 3000;
+    
+    // Setup Server-Sent Events connection
+    function setupRealTimeUpdates() {
+        if (eventSource) {
+            eventSource.close();
+        }
+        
+        const currentPage = getCurrentPage();
+        debugLog(`🔄 Setting up real-time updates for ${currentPage} page`);
+        
+        try {
+            eventSource = new EventSource('/api/events');
+            
+            eventSource.onopen = function() {
+                debugLog('🔗 Real-time connection established');
+                reconnectAttempts = 0;
+                showConnectionStatus(true);
+            };
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleRealTimeEvent(data);
+                } catch (error) {
+                    debugLog('❌ Failed to parse SSE event:', error);
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                debugLog('🔌 Real-time connection error:', error);
+                showConnectionStatus(false);
+                
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    setTimeout(() => {
+                        reconnectAttempts++;
+                        debugLog(`🔄 Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
+                        setupRealTimeUpdates();
+                    }, RECONNECT_DELAY * reconnectAttempts);
+                } else {
+                    debugLog('❌ Max reconnection attempts reached, falling back to polling');
+                    fallbackToPolling();
+                }
+            };
+            
+        } catch (error) {
+            debugLog('❌ Failed to setup SSE, falling back to polling:', error);
+            fallbackToPolling();
+        }
+    }
+    
+    // Handle incoming real-time events
+    function handleRealTimeEvent(event) {
+        const currentPage = getCurrentPage();
+        debugLog(`📨 Real-time event received: ${event.type}`, event.data);
+        
+        switch (event.type) {
+            case 'connected':
+                debugLog('✅ Real-time updates connected');
+                break;
+                
+            case 'heartbeat':
+                // Silent heartbeat - just keep connection alive
+                break;
+                
+            case 'NEW_ORDER':
+                if (currentPage === 'manager') {
+                    debugLog('🔔 New order received - refreshing manager view');
+                    playNewOrderSound();
+                    showNewOrderNotification(1);
+                    loadOrders();
+                }
+                // Always refresh recent orders
+                loadRecentOrders();
+                break;
+                
+            case 'ORDER_STATUS_UPDATED':
+                if (currentPage === 'manager') {
+                    debugLog('📝 Order status updated - refreshing manager view');
+                    loadOrders();
+                }
+                if (currentPage === 'tracking') {
+                    const trackingOrderId = getOrderIdFromUrl();
+                    if (trackingOrderId === event.data.orderId) {
+                        debugLog(`📱 Tracked order ${trackingOrderId} updated - refreshing tracking view`);
+                        loadOrderTracking();
+                    }
+                }
+                loadRecentOrders();
+                break;
+                
+            case 'KITCHEN_STATUS_CHANGED':
+                debugLog(`🏪 Kitchen status changed to: ${event.data.isOpen ? 'OPEN' : 'CLOSED'}`);
+                kitchenOpen = event.data.isOpen;
+                
+                if (currentPage === 'manager') {
+                    updateKitchenButton();
+                    loadOrders();
+                } else if (currentPage === 'order') {
+                    updateOrderPageDisplay();
+                }
+                
+                showMessage('success', `Kitchen ${event.data.isOpen ? 'opened' : 'closed'}!`, 3000);
+                break;
+                
+            case 'ORDERS_CLEARED':
+                if (currentPage === 'manager') {
+                    debugLog('🗑️ All orders cleared - refreshing manager view');
+                    loadOrders();
+                }
+                if (currentPage === 'tracking') {
+                    debugLog('🗑️ Orders cleared - updating tracking view');
+                    loadOrderTracking();
+                }
+                loadRecentOrders();
+                break;
+                
+            case 'ORDER_DELETED':
+                if (currentPage === 'manager') {
+                    debugLog(`🗑️ Order ${event.data.orderId} deleted - refreshing manager view`);
+                    loadOrders();
+                }
+                if (currentPage === 'tracking') {
+                    const trackingOrderId = getOrderIdFromUrl();
+                    if (trackingOrderId === event.data.orderId) {
+                        debugLog(`🗑️ Tracked order ${trackingOrderId} was deleted`);
+                        const trackingOrderDetails = document.getElementById('trackingOrderDetails');
+                        if (trackingOrderDetails) {
+                            trackingOrderDetails.innerHTML = `
+                                <div class="error-message" style="display: block;">
+                                    This order has been deleted by a manager.
+                                </div>
+                            `;
+                        }
+                    }
+                }
+                loadRecentOrders();
+                break;
+                
+            default:
+                debugLog('🤷 Unknown event type:', event.type);
+        }
+    }
+    
+    // Show connection status indicator
+    function showConnectionStatus(connected) {
+        // You can add a visual indicator here if desired
+        debugLog(`🔗 Connection status: ${connected ? 'Connected' : 'Disconnected'}`);
+    }
+    
+    // Fallback to polling if SSE fails
+    function fallbackToPolling() {
+        debugLog('📡 Falling back to polling mode');
+        startEventDrivenUpdates();
+    }
+    
+    // Close real-time connection
+    function closeRealTimeConnection() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+            debugLog('🔌 Real-time connection closed');
+        }
+    }
     
     // Enhanced debug mode with performance tracking
     const DEBUG_MODE = false;
@@ -357,7 +528,7 @@ FOOD_OPTIONS['New Food Item'] = {
         window.location.href = window.location.pathname;
     }
 
-    // ========== REDUCED FREQUENCY UPDATE SYSTEM ==========
+    // ========== REDUCED FREQUENCY UPDATE SYSTEM (FALLBACK) ==========
     
     let lastDataHash = '';
     let lastOrderCount = 0;
@@ -366,11 +537,11 @@ FOOD_OPTIONS['New Food Item'] = {
     let lastKitchenStatus = null;
     let lastRecentOrdersHash = '';
     
-    // MUCH LONGER intervals to reduce requests
+    // MUCH LONGER intervals to reduce requests (only used as fallback)
     const UPDATE_INTERVALS = {
-        manager: 20000,    // 20 seconds (was 3 seconds) 
-        tracking: 15000,   // 15 seconds (was 2 seconds)
-        order: 60000       // 1 minute (was 5 seconds)
+        manager: 30000,    // 30 seconds (fallback only) 
+        tracking: 20000,   // 20 seconds (fallback only)
+        order: 120000      // 2 minutes (fallback only)
     };
     
     function calculateDataHash(orders, recentOrders, kitchenStatus) {
@@ -489,9 +660,9 @@ FOOD_OPTIONS['New Food Item'] = {
         }
         
         const currentPage = getCurrentPage();
-        const intervalTime = UPDATE_INTERVALS[currentPage] || 60000;
+        const intervalTime = UPDATE_INTERVALS[currentPage] || 120000;
         
-        debugLog(`🕒 Starting reduced-frequency updates for ${currentPage} page (${intervalTime}ms interval)`);
+        debugLog(`🕒 Starting fallback polling for ${currentPage} page (${intervalTime}ms interval)`);
         
         updateCheckInterval = setInterval(async () => {
             // Skip if tab is hidden to save requests
@@ -514,7 +685,7 @@ FOOD_OPTIONS['New Food Item'] = {
                 );
                 
                 // Get recent orders (less frequently)
-                if (Math.random() < 0.5) { // Only 50% of the time
+                if (Math.random() < 0.3) { // Only 30% of the time
                     requestPromises.push(
                         fetch('/api/orders?completed-orders=true').then(r => r.json()).catch(() => [])
                     );
@@ -538,87 +709,29 @@ FOOD_OPTIONS['New Food Item'] = {
                 const currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
                 
                 let hasChanges = false;
-                let shouldForceRefresh = false;
                 
-                // Kitchen status change detection
-                if (lastKitchenStatus !== null && kitchenResp.isOpen !== lastKitchenStatus) {
-                    debugLog(`🔄 Kitchen status changed: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
-                    kitchenOpen = kitchenResp.isOpen;
-                    shouldForceRefresh = true;
+                // Only check for changes if we have existing data
+                if (lastDataHash && currentHash !== lastDataHash) {
+                    debugLog(`📊 Fallback polling detected changes, refreshing UI`);
                     
-                    // Update relevant UI components
                     if (currentPage === 'manager') {
-                        updateKitchenButton();
                         await loadOrders();
-                    } else if (currentPage === 'order') {
-                        updateOrderPageDisplay();
-                    }
-                    
-                    showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 2000);
-                    hasChanges = true;
-                }
-                lastKitchenStatus = kitchenResp.isOpen;
-                
-                // NEW ORDER DETECTION WITH SOUND
-                if (lastOrderCount > 0 && ordersResp.length > lastOrderCount && currentPage === 'manager') {
-                    const newOrdersCount = ordersResp.length - lastOrderCount;
-                    debugLog(`🔔 NEW ORDERS DETECTED: ${lastOrderCount} → ${ordersResp.length} (+${newOrdersCount})`);
-                    
-                    // Play sound notification
-                    playNewOrderSound();
-                    
-                    // Show enhanced notification
-                    showNewOrderNotification(newOrdersCount);
-                    shouldForceRefresh = true;
-                    hasChanges = true;
-                }
-                lastOrderCount = Array.isArray(ordersResp) ? ordersResp.length : 0;
-                
-                // Order status changes detection
-                if (currentHash !== lastDataHash && lastDataHash !== '') {
-                    debugLog(`📊 Data changes detected, refreshing UI`);
-                    shouldForceRefresh = true;
-                    hasChanges = true;
-                }
-                
-                // Tracking page specific monitoring
-                if (currentPage === 'tracking') {
-                    const trackingOrderId = getOrderIdFromUrl();
-                    const currentOrder = ordersResp.find(o => o.id === trackingOrderId) || 
-                                       recentResp.find(o => o.id === trackingOrderId);
-                    
-                    const currentOrderData = currentOrder ? 
-                        `${currentOrder.id}-${currentOrder.status}-${currentOrder.timestamp || currentOrder.completedAt}` : 
-                        'not-found';
-                    
-                    if (lastTrackingOrderData && currentOrderData !== lastTrackingOrderData) {
-                        debugLog(`📱 Tracked order ${trackingOrderId} changed, updating`);
+                    } else if (currentPage === 'tracking') {
                         await loadOrderTracking();
-                        hasChanges = true;
                     }
                     
-                    lastTrackingOrderData = currentOrderData;
-                }
-                
-                // Force refresh manager portal on significant changes
-                if (shouldForceRefresh && currentPage === 'manager') {
-                    debugLog(`🔄 Force refreshing manager portal`);
-                    await loadOrders();
-                }
-                
-                // Update recent orders if there are changes
-                if (hasChanges) {
                     await loadRecentOrders();
+                    hasChanges = true;
                 }
                 
                 lastDataHash = currentHash;
                 
                 if (hasChanges) {
-                    debugLog(`✅ Changes processed for ${currentPage} page`);
+                    debugLog(`✅ Fallback polling updated ${currentPage} page`);
                 }
                 
             } catch (error) {
-                debugLog('❌ Update error:', error.message);
+                debugLog('❌ Fallback polling error:', error.message);
             }
         }, intervalTime);
     }
@@ -627,93 +740,7 @@ FOOD_OPTIONS['New Food Item'] = {
         if (updateCheckInterval) {
             clearInterval(updateCheckInterval);
             updateCheckInterval = null;
-            debugLog('🛑 Updates stopped');
-        }
-    }
-
-    // Enhanced update triggers with forced refreshes
-    async function triggerUIUpdate(action, data = {}) {
-        const currentPage = getCurrentPage();
-        debugLog(`🚀 ${action} - forcing immediate UI update`);
-        
-        try {
-            switch (action) {
-                case 'ORDER_PLACED':
-                    await loadRecentOrders();
-                    if (currentPage === 'manager') {
-                        await loadOrders();
-                    }
-                    break;
-                    
-                case 'ORDER_STATUS_UPDATED':
-                    if (currentPage === 'manager') {
-                        await loadOrders();
-                    }
-                    await loadRecentOrders();
-                    
-                    if (currentPage === 'tracking') {
-                        const trackingOrderId = getOrderIdFromUrl();
-                        if (trackingOrderId === data.orderId) {
-                            debugLog(`📱 Immediately refreshing tracking page for order ${data.orderId}`);
-                            await loadOrderTracking();
-                        }
-                    }
-                    
-                    if (data.orderId) {
-                        lastTrackingOrderData = `${data.orderId}-${data.newStatus}-${new Date().getTime()}`;
-                    }
-                    break;
-                    
-                case 'KITCHEN_STATUS_CHANGED':
-                    kitchenOpen = data.isOpen;
-                    
-                    if (currentPage === 'manager') {
-                        updateKitchenButton();
-                        await loadOrders();
-                    } else if (currentPage === 'order') {
-                        updateOrderPageDisplay();
-                    }
-                    
-                    showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 2000);
-                    debugLog(`🏪 Kitchen status updated to: ${data.isOpen}`);
-                    break;
-                    
-                case 'ORDERS_CLEARED':
-                    if (currentPage === 'manager') {
-                        await loadOrders();
-                    }
-                    await loadRecentOrders();
-                    
-                    if (currentPage === 'tracking') {
-                        debugLog(`🗑️ Orders cleared, updating tracking page`);
-                        await loadOrderTracking();
-                    }
-                    break;
-                    
-                case 'ORDER_DELETED':
-                    if (currentPage === 'manager') {
-                        await loadOrders();
-                    }
-                    await loadRecentOrders();
-                    
-                    if (currentPage === 'tracking') {
-                        const trackingOrderId = getOrderIdFromUrl();
-                        if (trackingOrderId === data.orderId) {
-                            debugLog(`🗑️ Order ${data.orderId} deleted, showing message on tracking page`);
-                            const trackingOrderDetails = document.getElementById('trackingOrderDetails');
-                            if (trackingOrderDetails) {
-                                trackingOrderDetails.innerHTML = `
-                                    <div class="error-message" style="display: block;">
-                                        This order has been deleted by a manager.
-                                    </div>
-                                `;
-                            }
-                        }
-                    }
-                    break;
-            }
-        } catch (error) {
-            debugLog(`❌ Error in ${action}:`, error.message);
+            debugLog('🛑 Fallback polling stopped');
         }
     }
 
@@ -837,9 +864,7 @@ FOOD_OPTIONS['New Food Item'] = {
             
             showMessage('success', `Order #${orderId} has been permanently deleted`);
             
-            await triggerUIUpdate('ORDER_DELETED', { orderId });
-            
-            debugLog(`[DELETE ORDER] UI updated after deletion`);
+            debugLog(`[DELETE ORDER] Deletion completed - real-time updates will handle UI refresh`);
             
         } catch (error) {
             debugLog('[DELETE ORDER] Error:', error);
@@ -970,9 +995,7 @@ FOOD_OPTIONS['New Food Item'] = {
             
             await setKitchenStatus(kitchenOpen);
             
-            await triggerUIUpdate('KITCHEN_STATUS_CHANGED', { isOpen: kitchenOpen });
-            
-            debugLog(`[KITCHEN] Status changed from ${previousStatus} to ${kitchenOpen}`);
+            debugLog(`[KITCHEN] Status changed from ${previousStatus} to ${kitchenOpen} - real-time updates will handle UI refresh`);
             
         } catch (error) {
             console.error('Failed to update kitchen status:', error.message);
@@ -1075,7 +1098,10 @@ FOOD_OPTIONS['New Food Item'] = {
     }
 
     function showPage(pageName) {
-        // Stop existing updates when changing pages
+        // Close existing real-time connection when changing pages
+        closeRealTimeConnection();
+        
+        // Stop fallback polling
         stopEventDrivenUpdates();
         
         // Manager portal authentication
@@ -1098,19 +1124,19 @@ FOOD_OPTIONS['New Food Item'] = {
             loadOrders();
             checkKitchenStatus();
             loadRecentOrders();
-            startEventDrivenUpdates();
+            setupRealTimeUpdates(); // Real-time updates for manager
         } else if (pageName === 'tracking') {
             document.getElementById('trackingPage').classList.add('active');
             document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Track Your Order';
             loadOrderTracking();
             loadRecentOrders();
-            startEventDrivenUpdates();
+            setupRealTimeUpdates(); // Real-time updates for tracking
         } else {
             document.getElementById('orderPage').classList.add('active');
             document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering';
             checkKitchenStatus();
             loadRecentOrders();
-            startEventDrivenUpdates();
+            setupRealTimeUpdates(); // Real-time updates for order page
         }
     }
 
@@ -1232,9 +1258,7 @@ FOOD_OPTIONS['New Food Item'] = {
             
             showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
             
-            await triggerUIUpdate('ORDER_STATUS_UPDATED', { orderId, newStatus });
-            
-            debugLog(`[UPDATE STATUS] UI updated for affected views`);
+            debugLog(`[UPDATE STATUS] Status update completed - real-time updates will handle UI refresh`);
             
         } catch (error) {
             debugLog('[UPDATE STATUS] Error:', error);
@@ -1263,9 +1287,7 @@ FOOD_OPTIONS['New Food Item'] = {
             await clearOrders();
             showMessage('success', 'All orders cleared');
             
-            await triggerUIUpdate('ORDERS_CLEARED');
-            
-            debugLog(`[CLEAR ORDERS] All orders cleared and UI updated`);
+            debugLog(`[CLEAR ORDERS] All orders cleared - real-time updates will handle UI refresh`);
             
         } catch (error) {
             console.error('Clear orders error:', error.message);
@@ -1398,7 +1420,7 @@ FOOD_OPTIONS['New Food Item'] = {
         
         showPage(currentPage);
         
-        debugLog(`[INIT] Application initialized on ${currentPage} page with reduced-frequency updates`);
+        debugLog(`[INIT] Application initialized on ${currentPage} page with real-time updates`);
     }
 
     // Enhanced Event Listeners
@@ -1439,9 +1461,7 @@ FOOD_OPTIONS['New Food Item'] = {
                         existingOptions.remove();
                     }
                     
-                    debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id}`);
-                    
-                    await triggerUIUpdate('ORDER_PLACED', { orderId: response.order?.id });
+                    debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id} - real-time updates will handle UI refresh`);
                     
                     if (response.order && response.order.id) {
                         setTimeout(() => {
@@ -1543,8 +1563,9 @@ FOOD_OPTIONS['New Food Item'] = {
 
     // Enhanced cleanup and navigation handling
     window.addEventListener('beforeunload', function() {
+        closeRealTimeConnection();
         stopEventDrivenUpdates();
-        debugLog('[CLEANUP] Stopping updates before page unload');
+        debugLog('[CLEANUP] Stopping updates and closing connections before page unload');
     });
     
     window.addEventListener('popstate', function() {
@@ -1555,9 +1576,9 @@ FOOD_OPTIONS['New Food Item'] = {
     // Handle visibility changes to pause/resume updates when tab is hidden/shown
     document.addEventListener('visibilitychange', function() {
         if (document.hidden) {
-            debugLog('[VISIBILITY] Tab hidden - updates will pause');
+            debugLog('[VISIBILITY] Tab hidden - real-time connection will pause');
         } else {
-            debugLog('[VISIBILITY] Tab visible - updates will resume');
+            debugLog('[VISIBILITY] Tab visible - real-time connection will resume');
             // Force a quick update when tab becomes visible again
             setTimeout(() => {
                 const currentPage = getCurrentPage();
@@ -1574,16 +1595,15 @@ FOOD_OPTIONS['New Food Item'] = {
     // Show performance info on page load
     setTimeout(() => {
         if (DEBUG_MODE) {
-            console.log('📊 Request Reduction Summary:');
-            console.log('🕒 Update Intervals:', UPDATE_INTERVALS);
-            console.log('🔄 Manager page: 20 seconds (was 3 seconds)');
-            console.log('📱 Tracking page: 15 seconds (was 2 seconds)');
-            console.log('📝 Order page: 1 minute (was 5 seconds)');
+            console.log('📊 Real-time Updates Summary:');
+            console.log('🔄 Real-time events via Server-Sent Events (SSE)');
+            console.log('📡 Fallback polling intervals:', UPDATE_INTERVALS);
             console.log('🔔 Bell sound notifications enabled (/assets/bell.mp3)');
             console.log('🎵 Audio requires user interaction (Chrome autoplay policy)');
             console.log('🍔 Enhanced food selection system enabled');
             console.log('🖱️ Triple-click header for direct manager authentication');
             console.log('🎯 Click anywhere to enable audio notifications');
+            console.log('⚡ Instant updates for: Kitchen status, New orders, Order status changes');
         }
     }, 1000);
     
@@ -1594,14 +1614,14 @@ FOOD_OPTIONS['New Food Item'] = {
             setupEventListeners();
             initEnhancedFoodSystem();
             init();
-            debugLog('[STARTUP] Application fully loaded with enhanced food selection system');
+            debugLog('[STARTUP] Application fully loaded with real-time updates and enhanced food selection');
         });
     } else {
         setupActivityTracking();
         setupEventListeners();
         initEnhancedFoodSystem();
         init();
-        debugLog('[STARTUP] Application fully loaded with enhanced food selection system');
+        debugLog('[STARTUP] Application fully loaded with real-time updates and enhanced food selection');
     }
 
 })();
