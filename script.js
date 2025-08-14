@@ -294,13 +294,21 @@ FOOD_OPTIONS['New Food Item'] = {
     // Server-Sent Events connection for real-time updates
     let eventSource = null;
     let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
-    const RECONNECT_DELAY = 3000;
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    const RECONNECT_DELAY = 2000;
+    let sseSupported = true;
+    let isUsingPolling = false;
     
     // Setup Server-Sent Events connection
     function setupRealTimeUpdates() {
         if (eventSource) {
             eventSource.close();
+        }
+        
+        // If SSE is not supported or we've given up, use polling
+        if (!sseSupported || isUsingPolling) {
+            fallbackToPolling();
+            return;
         }
         
         const currentPage = getCurrentPage();
@@ -335,13 +343,23 @@ FOOD_OPTIONS['New Food Item'] = {
                         setupRealTimeUpdates();
                     }, RECONNECT_DELAY * reconnectAttempts);
                 } else {
-                    debugLog('❌ Max reconnection attempts reached, falling back to polling');
+                    debugLog('❌ Max reconnection attempts reached, SSE not available - falling back to polling');
+                    sseSupported = false;
                     fallbackToPolling();
                 }
             };
             
+            // Auto-reconnect every 20 seconds to handle Vercel timeout
+            setTimeout(() => {
+                if (eventSource && eventSource.readyState === EventSource.OPEN) {
+                    debugLog('🔄 Refreshing SSE connection to avoid timeout');
+                    setupRealTimeUpdates();
+                }
+            }, 20000);
+            
         } catch (error) {
             debugLog('❌ Failed to setup SSE, falling back to polling:', error);
+            sseSupported = false;
             fallbackToPolling();
         }
     }
@@ -441,13 +459,49 @@ FOOD_OPTIONS['New Food Item'] = {
     
     // Show connection status indicator
     function showConnectionStatus(connected) {
-        // You can add a visual indicator here if desired
-        debugLog(`🔗 Connection status: ${connected ? 'Connected' : 'Disconnected'}`);
+        // Add visual indicator to show connection status
+        let indicator = document.getElementById('connectionStatus');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'connectionStatus';
+            indicator.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                padding: 5px 10px;
+                border-radius: 5px;
+                font-size: 12px;
+                font-weight: bold;
+                z-index: 1000;
+                transition: all 0.3s ease;
+            `;
+            document.body.appendChild(indicator);
+        }
+        
+        if (connected) {
+            if (isUsingPolling) {
+                indicator.textContent = '📡 Polling Mode';
+                indicator.style.backgroundColor = '#ffc107';
+                indicator.style.color = '#000';
+            } else {
+                indicator.textContent = '🔗 Real-time';
+                indicator.style.backgroundColor = '#28a745';
+                indicator.style.color = 'white';
+            }
+        } else {
+            indicator.textContent = '❌ Offline';
+            indicator.style.backgroundColor = '#dc3545';
+            indicator.style.color = 'white';
+        }
+        
+        debugLog(`🔗 Connection status: ${connected ? (isUsingPolling ? 'Polling Mode' : 'Real-time') : 'Disconnected'}`);
     }
     
     // Fallback to polling if SSE fails
     function fallbackToPolling() {
-        debugLog('📡 Falling back to polling mode');
+        debugLog('📡 Falling back to enhanced polling mode');
+        isUsingPolling = true;
+        showConnectionStatus(true);
         startEventDrivenUpdates();
     }
     
@@ -537,11 +591,11 @@ FOOD_OPTIONS['New Food Item'] = {
     let lastKitchenStatus = null;
     let lastRecentOrdersHash = '';
     
-    // MUCH LONGER intervals to reduce requests (only used as fallback)
+    // SHORTER intervals for fallback polling to compensate for no real-time updates
     const UPDATE_INTERVALS = {
-        manager: 30000,    // 30 seconds (fallback only) 
-        tracking: 20000,   // 20 seconds (fallback only)
-        order: 120000      // 2 minutes (fallback only)
+        manager: 5000,     // 5 seconds for manager (needs frequent updates)
+        tracking: 8000,    // 8 seconds for tracking
+        order: 15000       // 15 seconds for order page
     };
     
     function calculateDataHash(orders, recentOrders, kitchenStatus) {
@@ -662,7 +716,7 @@ FOOD_OPTIONS['New Food Item'] = {
         const currentPage = getCurrentPage();
         const intervalTime = UPDATE_INTERVALS[currentPage] || 120000;
         
-        debugLog(`🕒 Starting fallback polling for ${currentPage} page (${intervalTime}ms interval)`);
+        debugLog(`🕒 Starting ${isUsingPolling ? 'enhanced' : 'fallback'} polling for ${currentPage} page (${intervalTime}ms interval)`);
         
         updateCheckInterval = setInterval(async () => {
             // Skip if tab is hidden to save requests
@@ -684,8 +738,9 @@ FOOD_OPTIONS['New Food Item'] = {
                     fetch('/api/orders').then(r => r.json()).catch(() => [])
                 );
                 
-                // Get recent orders (less frequently)
-                if (Math.random() < 0.3) { // Only 30% of the time
+                // Get recent orders more frequently when polling
+                const shouldGetRecent = isUsingPolling ? (Math.random() < 0.7) : (Math.random() < 0.3);
+                if (shouldGetRecent) {
                     requestPromises.push(
                         fetch('/api/orders?completed-orders=true').then(r => r.json()).catch(() => [])
                     );
@@ -710,9 +765,40 @@ FOOD_OPTIONS['New Food Item'] = {
                 
                 let hasChanges = false;
                 
+                // Enhanced change detection for polling mode
+                if (isUsingPolling) {
+                    // Check for new orders (for manager sound notifications)
+                    if (lastOrderCount > 0 && ordersResp.length > lastOrderCount && currentPage === 'manager') {
+                        const newOrdersCount = ordersResp.length - lastOrderCount;
+                        debugLog(`🔔 NEW ORDERS DETECTED via polling: ${lastOrderCount} → ${ordersResp.length} (+${newOrdersCount})`);
+                        
+                        // Play sound notification
+                        playNewOrderSound();
+                        showNewOrderNotification(newOrdersCount);
+                        hasChanges = true;
+                    }
+                    lastOrderCount = Array.isArray(ordersResp) ? ordersResp.length : 0;
+                    
+                    // Check for kitchen status changes
+                    if (lastKitchenStatus !== null && kitchenResp.isOpen !== lastKitchenStatus) {
+                        debugLog(`🔄 Kitchen status changed via polling: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
+                        kitchenOpen = kitchenResp.isOpen;
+                        
+                        if (currentPage === 'manager') {
+                            updateKitchenButton();
+                        } else if (currentPage === 'order') {
+                            updateOrderPageDisplay();
+                        }
+                        
+                        showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 2000);
+                        hasChanges = true;
+                    }
+                    lastKitchenStatus = kitchenResp.isOpen;
+                }
+                
                 // Only check for changes if we have existing data
                 if (lastDataHash && currentHash !== lastDataHash) {
-                    debugLog(`📊 Fallback polling detected changes, refreshing UI`);
+                    debugLog(`📊 ${isUsingPolling ? 'Enhanced' : 'Fallback'} polling detected changes, refreshing UI`);
                     
                     if (currentPage === 'manager') {
                         await loadOrders();
@@ -727,11 +813,11 @@ FOOD_OPTIONS['New Food Item'] = {
                 lastDataHash = currentHash;
                 
                 if (hasChanges) {
-                    debugLog(`✅ Fallback polling updated ${currentPage} page`);
+                    debugLog(`✅ ${isUsingPolling ? 'Enhanced' : 'Fallback'} polling updated ${currentPage} page`);
                 }
                 
             } catch (error) {
-                debugLog('❌ Fallback polling error:', error.message);
+                debugLog('❌ Polling error:', error.message);
             }
         }, intervalTime);
     }
@@ -740,7 +826,7 @@ FOOD_OPTIONS['New Food Item'] = {
         if (updateCheckInterval) {
             clearInterval(updateCheckInterval);
             updateCheckInterval = null;
-            debugLog('🛑 Fallback polling stopped');
+            debugLog('🛑 Polling stopped');
         }
     }
 
@@ -1596,14 +1682,15 @@ FOOD_OPTIONS['New Food Item'] = {
     setTimeout(() => {
         if (DEBUG_MODE) {
             console.log('📊 Real-time Updates Summary:');
-            console.log('🔄 Real-time events via Server-Sent Events (SSE)');
-            console.log('📡 Fallback polling intervals:', UPDATE_INTERVALS);
+            console.log('🔄 Real-time events via Server-Sent Events (SSE) with polling fallback');
+            console.log('📡 Enhanced polling intervals:', UPDATE_INTERVALS);
             console.log('🔔 Bell sound notifications enabled (/assets/bell.mp3)');
             console.log('🎵 Audio requires user interaction (Chrome autoplay policy)');
             console.log('🍔 Enhanced food selection system enabled');
             console.log('🖱️ Triple-click header for direct manager authentication');
             console.log('🎯 Click anywhere to enable audio notifications');
-            console.log('⚡ Instant updates for: Kitchen status, New orders, Order status changes');
+            console.log('⚡ Real-time updates for: Kitchen status, New orders, Order status changes');
+            console.log('🔗 Connection indicator in top-right corner');
         }
     }, 1000);
     
