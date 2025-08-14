@@ -1,135 +1,24 @@
-// script.js - Optimized Food Ordering System with Rate Limiting
-// Fixed excessive API calls and added proper rate limiting with notifications
+// script.js - Complete Food Ordering System
+// All application logic and authentication with enhanced real-time updates
 
 (function() {
     'use strict';
-    
-    // ========== RATE LIMITING SYSTEM ==========
-    
-    const RATE_LIMITS = {
-        maxRequestsPerMinute: 20, // Very conservative
-        maxRequestsPerHour: 200,  // Reduced further
-        burstLimit: 3,            // Reduced burst limit
-        cooldownMs: 3000          // Longer cooldown
-    };
-    
-    let requestTracker = {
-        minuteRequests: [],
-        hourRequests: [],
-        lastBurstTime: 0,
-        burstCount: 0,
-        isRateLimited: false
-    };
-    
-    // Rate limit notification system
-    function showRateLimitNotification(message, type = 'warning') {
-        // Remove existing notification
-        const existing = document.getElementById('rate-limit-notification');
-        if (existing) existing.remove();
-        
-        const notification = document.createElement('div');
-        notification.id = 'rate-limit-notification';
-        notification.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: ${type === 'error' ? '#dc3545' : '#ffc107'};
-            color: ${type === 'error' ? 'white' : '#000'};
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            border: 2px solid #000;
-            max-width: 300px;
-            font-family: 'Poppins', sans-serif;
-            animation: slideIn 0.3s ease;
-        `;
-        
-        notification.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span>${type === 'error' ? '🚫' : '⚠️'}</span>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => notification.remove(), 300);
-            }
-        }, 5000);
-    }
-    
-    // Add animations
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
-    
-    function checkRateLimit() {
-        const now = Date.now();
-        
-        // Clean old entries
-        requestTracker.minuteRequests = requestTracker.minuteRequests.filter(time => now - time < 60000);
-        requestTracker.hourRequests = requestTracker.hourRequests.filter(time => now - time < 3600000);
-        
-        // Check burst limiting
-        if (now - requestTracker.lastBurstTime < RATE_LIMITS.cooldownMs) {
-            requestTracker.burstCount++;
-            if (requestTracker.burstCount > RATE_LIMITS.burstLimit) {
-                showRateLimitNotification('Slow down! Too many requests too quickly.', 'warning');
-                return false;
-            }
-        } else {
-            requestTracker.burstCount = 0;
-        }
-        
-        // Check minute limit
-        if (requestTracker.minuteRequests.length >= RATE_LIMITS.maxRequestsPerMinute) {
-            showRateLimitNotification('Rate limited: Max requests per minute reached', 'error');
-            requestTracker.isRateLimited = true;
-            return false;
-        }
-        
-        // Check hour limit
-        if (requestTracker.hourRequests.length >= RATE_LIMITS.maxRequestsPerHour) {
-            showRateLimitNotification('Rate limited: Hourly request limit reached', 'error');
-            requestTracker.isRateLimited = true;
-            return false;
-        }
-        
-        // Rate limit passed
-        requestTracker.minuteRequests.push(now);
-        requestTracker.hourRequests.push(now);
-        requestTracker.lastBurstTime = now;
-        requestTracker.isRateLimited = false;
-        
-        return true;
-    }
     
     // ========== AUTHENTICATION SYSTEM ==========
     
     // Obfuscated authentication data
     const AUTH_CONFIG = {
+        // Base64 encoded
         key: 'S2FlZHluSXNDb29s',
         salt: 'food_mgr_2025',
         sessionKey: 'manager_session_v2'
     };
     
-    const SESSION_DURATION = 60 * 60 * 1000;
-    const ACTIVITY_TIMEOUT = 60 * 60 * 1000;
+    // Session management constants
+    const SESSION_DURATION = 60 * 60 * 1000; // 1 hour
+    const ACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hour inactivity
     
+    // Decode authentication key
     function getAuthKey() {
         try {
             return atob(AUTH_CONFIG.key);
@@ -138,6 +27,7 @@
         }
     }
     
+    // Validate password
     function validateCredentials(input) {
         if (!input || typeof input !== 'string') return false;
         const expected = getAuthKey();
@@ -145,6 +35,7 @@
         return input === expected;
     }
     
+    // Session management functions
     function createSession() {
         const now = Date.now();
         const sessionData = {
@@ -209,6 +100,7 @@
         return true;
     }
     
+    // Main authentication function
     function authenticateManager() {
         if (isSessionValid()) {
             updateSessionActivity();
@@ -231,9 +123,8 @@
         }
     }
     
+    // Activity tracking setup
     function setupActivityTracking() {
-        setupUserActivityTracking(); // Add user activity tracking
-        
         const events = ['click', 'keypress', 'mousemove', 'scroll', 'touchstart'];
         
         events.forEach(eventType => {
@@ -255,6 +146,7 @@
     
     // ========== MAIN APPLICATION ==========
     
+    // Enhanced debug mode with performance tracking
     const DEBUG_MODE = true;
     let performanceMetrics = {
         requests: 0,
@@ -276,9 +168,10 @@
             (performanceMetrics.averageResponseTime * (performanceMetrics.requests - 1) + responseTime) / performanceMetrics.requests;
         performanceMetrics.lastRequestTime = responseTime;
         
-        debugLog(`⚡ Response Time: ${responseTime.toFixed(2)}ms (Avg: ${performanceMetrics.averageResponseTime.toFixed(2)}ms)`);
+        debugLog(`⚡ Upstash Response Time: ${responseTime.toFixed(2)}ms (Avg: ${performanceMetrics.averageResponseTime.toFixed(2)}ms)`);
     }
 
+    // Utility functions
     function getNZTime() {
         return new Date().toLocaleString('en-NZ', {
             timeZone: 'Pacific/Auckland',
@@ -291,6 +184,7 @@
         });
     }
 
+    // Enhanced UI Functions
     function showMessage(type, message, duration = 3000) {
         const messageEl = document.getElementById(`${type}Message`);
         if (messageEl) {
@@ -320,255 +214,246 @@
         window.location.href = window.location.pathname;
     }
 
-    // ========== EVENT-DRIVEN UPDATE SYSTEM ==========
-    
-    let lastDataCache = {
-        orders: null,
-        recentOrders: null,
-        kitchenStatus: null,
-        lastUpdate: 0,
-        orderHashes: new Map(), // Track individual order states
-        lastOrderCount: 0,
-        lastKitchenStatus: null
-    };
-    
+    // Enhanced event-driven update system
+    let lastDataHash = '';
+    let lastOrderCount = 0;
     let updateCheckInterval;
-    let userInteractionTime = Date.now();
-    let isUserActive = true;
+    let lastTrackingOrderData = null;
+    let lastKitchenStatus = null;
+    let lastRecentOrdersHash = '';
     
-    // Only check for changes every 30 seconds - but only request data if changes detected
-    const CHANGE_CHECK_INTERVAL = 30000;
-    const CACHE_DURATION = 60000; // 1 minute cache
-    
-    // Track user activity
-    function updateUserActivity() {
-        userInteractionTime = Date.now();
-        isUserActive = true;
-    }
-    
-    function setupUserActivityTracking() {
-        const events = ['click', 'keypress', 'mousemove', 'scroll', 'touchstart', 'focus'];
-        
-        events.forEach(eventType => {
-            document.addEventListener(eventType, updateUserActivity, { passive: true });
+    function calculateDataHash(orders, recentOrders, kitchenStatus) {
+        const dataString = JSON.stringify({
+            orders: orders.map(o => `${o.id}-${o.status}-${o.timestamp}`),
+            recentCount: recentOrders.length,
+            recentHash: recentOrders.map(o => `${o.id}-${o.status}`).join(','),
+            kitchen: kitchenStatus
         });
-        
-        // Check if user has been idle for 10 minutes
-        setInterval(() => {
-            const idleTime = Date.now() - userInteractionTime;
-            const wasActive = isUserActive;
-            isUserActive = idleTime < 600000; // 10 minutes
-            
-            if (wasActive && !isUserActive) {
-                debugLog('[ACTIVITY] User went idle - stopping all updates');
-                stopSmartUpdates();
-            } else if (!wasActive && isUserActive) {
-                debugLog('[ACTIVITY] User became active - resuming smart updates');
-                const currentPage = getCurrentPage();
-                if (currentPage === 'manager' || currentPage === 'tracking') {
-                    startSmartUpdates();
-                }
-            }
-        }, 60000);
+        return btoa(dataString).slice(0, 20);
     }
     
-    // Create a lightweight "change detection" endpoint that returns minimal data
-    async function checkForChanges() {
-        if (!checkRateLimit()) {
-            debugLog('[RATE LIMIT] Skipping change check');
-            return null;
-        }
-        
-        try {
-            const startTime = performance.now();
-            
-            // Make a very lightweight request to get just the summary
-            const response = await fetch('/api/orders');
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const orders = await response.json();
-            
-            trackPerformance(startTime);
-            
-            // Create a simple hash of the current state
-            const currentState = {
-                orderCount: Array.isArray(orders) ? orders.length : 0,
-                orderIds: Array.isArray(orders) ? orders.map(o => o.id).sort().join(',') : '',
-                orderStatuses: Array.isArray(orders) ? orders.map(o => `${o.id}:${o.status}`).join('|') : ''
-            };
-            
-            return { orders, currentState };
-        } catch (error) {
-            debugLog('[CHANGE CHECK] Error:', error.message);
-            return null;
-        }
-    }
-    
-    // Only fetch full data when we detect actual changes
-    async function fetchDataIfChanged(changeData) {
-        const { orders, currentState } = changeData;
-        const currentPage = getCurrentPage();
-        
-        let needsUpdate = false;
-        let updateReason = '';
-        
-        // Check if order count changed
-        if (currentState.orderCount !== lastDataCache.lastOrderCount) {
-            needsUpdate = true;
-            updateReason = `Order count: ${lastDataCache.lastOrderCount} → ${currentState.orderCount}`;
-        }
-        
-        // Check if any order statuses changed
-        const lastOrderStatuses = lastDataCache.orderStatuses || '';
-        if (currentState.orderStatuses !== lastOrderStatuses) {
-            needsUpdate = true;
-            updateReason = updateReason || 'Order status changed';
-        }
-        
-        // For tracking page, only care about the specific order being tracked
-        if (currentPage === 'tracking') {
-            const orderId = getOrderIdFromUrl();
-            if (orderId) {
-                const currentOrder = orders.find(o => o.id === orderId);
-                const lastOrderHash = lastDataCache.orderHashes.get(orderId);
-                const currentOrderHash = currentOrder ? `${currentOrder.status}-${currentOrder.timestamp}` : 'not-found';
-                
-                if (currentOrderHash !== lastOrderHash) {
-                    needsUpdate = true;
-                    updateReason = `Tracked order ${orderId} changed`;
-                    lastDataCache.orderHashes.set(orderId, currentOrderHash);
-                }
-            }
-        }
-        
-        // Update our tracking variables
-        lastDataCache.lastOrderCount = currentState.orderCount;
-        lastDataCache.orderStatuses = currentState.orderStatuses;
-        
-        if (needsUpdate) {
-            debugLog(`[SMART UPDATE] ${updateReason} - fetching fresh data`);
-            
-            // Now fetch the additional data we need
-            const promises = [];
-            
-            // Get recent orders
-            promises.push(
-                fetch('/api/orders?completed-orders=true')
-                    .then(r => r.json())
-                    .catch(() => [])
-            );
-            
-            // Get kitchen status (only for manager)
-            if (currentPage === 'manager') {
-                promises.push(
-                    fetch('/api/orders?kitchen-status=true')
-                        .then(r => r.json())
-                        .catch(() => ({ isOpen: false }))
-                );
-            }
-            
-            const [recentOrders, kitchenStatus] = await Promise.all(promises);
-            
-            // Update UI based on what changed
-            if (currentPage === 'manager') {
-                await loadOrders();
-                
-                // Check kitchen status
-                if (kitchenStatus && kitchenStatus.isOpen !== lastDataCache.lastKitchenStatus) {
-                    kitchenOpen = kitchenStatus.isOpen;
-                    updateKitchenButton();
-                    showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`);
-                    lastDataCache.lastKitchenStatus = kitchenStatus.isOpen;
-                }
-                
-                // Check for new orders
-                if (currentState.orderCount > lastDataCache.lastOrderCount && lastDataCache.lastOrderCount > 0) {
-                    showNewOrderNotification();
-                }
-            } else if (currentPage === 'tracking') {
-                await loadOrderTracking();
-            }
-            
-            // Always update recent orders if there are changes
-            await loadRecentOrders();
-            
-            return true;
-        } else {
-            debugLog('[SMART UPDATE] No changes detected - skipping data fetch');
-            return false;
-        }
-    }
-    
-    function startSmartUpdates() {
+    function startEventDrivenUpdates() {
+        // Clear any existing interval
         if (updateCheckInterval) {
             clearInterval(updateCheckInterval);
         }
         
         const currentPage = getCurrentPage();
+        // Set different intervals based on page for optimal performance
+        const intervalTime = currentPage === 'tracking' ? 2000 : 
+                           currentPage === 'manager' ? 3000 : 5000;
         
-        // Only manager and tracking pages get smart updates
-        if (currentPage !== 'manager' && currentPage !== 'tracking') {
-            debugLog('[SMART UPDATES] No updates needed for order page');
-            return;
-        }
-        
-        debugLog(`[SMART UPDATES] Starting change detection for ${currentPage} page`);
+        debugLog(`[REAL-TIME] Starting updates for ${currentPage} page (${intervalTime}ms interval)`);
         
         updateCheckInterval = setInterval(async () => {
-            // Skip if tab is hidden, user is idle, or rate limited
-            if (document.hidden || !isUserActive || requestTracker.isRateLimited) {
-                return;
-            }
+            if (document.hidden) return; // Don't update when tab is hidden
+            
+            const startTime = performance.now();
             
             try {
-                // Step 1: Check for changes (lightweight request)
-                const changeData = await checkForChanges();
-                if (!changeData) return;
+                const currentPage = getCurrentPage();
                 
-                // Step 2: Only fetch full data if changes detected
-                await fetchDataIfChanged(changeData);
+                // Fetch all data in parallel for efficiency
+                const [ordersResp, recentResp, kitchenResp] = await Promise.all([
+                    fetch('/api/orders').then(r => r.json()).catch(() => []),
+                    fetch('/api/orders?completed-orders=true').then(r => r.json()).catch(() => []),
+                    fetch('/api/orders?kitchen-status=true').then(r => r.json()).catch(() => ({ isOpen: false }))
+                ]);
+                
+                trackPerformance(startTime);
+                
+                const currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
+                
+                let hasChanges = false;
+                let shouldForceRefresh = false;
+                
+                // Kitchen status change detection with immediate refresh
+                if (lastKitchenStatus !== null && kitchenResp.isOpen !== lastKitchenStatus) {
+                    debugLog(`[REAL-TIME] 🔄 Kitchen status changed: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
+                    kitchenOpen = kitchenResp.isOpen;
+                    shouldForceRefresh = true;
+                    
+                    // Update all relevant UI components immediately
+                    if (currentPage === 'manager') {
+                        updateKitchenButton();
+                        await loadOrders(); // Force refresh manager orders
+                    } else if (currentPage === 'order') {
+                        updateOrderPageDisplay();
+                    }
+                    
+                    showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`, 2000);
+                    hasChanges = true;
+                }
+                lastKitchenStatus = kitchenResp.isOpen;
+                
+                // Order count change detection with new order notification
+                if (lastOrderCount > 0 && ordersResp.length > lastOrderCount && currentPage === 'manager') {
+                    const newOrdersCount = ordersResp.length - lastOrderCount;
+                    debugLog(`[REAL-TIME] 🔔 New orders detected: ${lastOrderCount} → ${ordersResp.length} (+${newOrdersCount})`);
+                    showNewOrderNotification();
+                    shouldForceRefresh = true;
+                    hasChanges = true;
+                }
+                lastOrderCount = Array.isArray(ordersResp) ? ordersResp.length : 0;
+                
+                // Order status changes detection
+                if (currentHash !== lastDataHash && lastDataHash !== '') {
+                    debugLog(`[REAL-TIME] 📊 Data changes detected, forcing refresh`);
+                    shouldForceRefresh = true;
+                    hasChanges = true;
+                }
+                
+                // Tracking page specific monitoring
+                if (currentPage === 'tracking') {
+                    const trackingOrderId = getOrderIdFromUrl();
+                    const currentOrder = ordersResp.find(o => o.id === trackingOrderId) || 
+                                       recentResp.find(o => o.id === trackingOrderId);
+                    
+                    const currentOrderData = currentOrder ? 
+                        `${currentOrder.id}-${currentOrder.status}-${currentOrder.timestamp || currentOrder.completedAt}` : 
+                        'not-found';
+                    
+                    if (lastTrackingOrderData && currentOrderData !== lastTrackingOrderData) {
+                        debugLog(`[REAL-TIME] 📱 Tracked order ${trackingOrderId} changed, updating immediately`);
+                        await loadOrderTracking();
+                        hasChanges = true;
+                    }
+                    
+                    lastTrackingOrderData = currentOrderData;
+                }
+                
+                // Force refresh manager portal on any significant change
+                if (shouldForceRefresh && currentPage === 'manager') {
+                    debugLog(`[REAL-TIME] 🔄 Force refreshing manager portal`);
+                    await loadOrders();
+                }
+                
+                // Always update recent orders if there are changes
+                if (hasChanges) {
+                    await loadRecentOrders();
+                }
+                
+                lastDataHash = currentHash;
+                
+                if (hasChanges) {
+                    debugLog(`[REAL-TIME] ✅ Changes processed for ${currentPage} page`);
+                }
                 
             } catch (error) {
-                debugLog('[SMART UPDATES] Error:', error.message);
+                debugLog('[REAL-TIME] ❌ Update error:', error.message);
             }
-        }, CHANGE_CHECK_INTERVAL);
+        }, intervalTime);
     }
     
-    function stopSmartUpdates() {
+    function stopEventDrivenUpdates() {
         if (updateCheckInterval) {
             clearInterval(updateCheckInterval);
             updateCheckInterval = null;
-            debugLog('[SMART UPDATES] Stopped');
-        }
-    }
-    
-    function stopOptimizedUpdates() {
-        if (updateCheckInterval) {
-            clearInterval(updateCheckInterval);
-            updateCheckInterval = null;
-            debugLog('[UPDATES] Stopped');
+            debugLog('[REAL-TIME] Updates stopped');
         }
     }
 
-    // ========== API FUNCTIONS WITH RATE LIMITING ==========
-    
-    async function rateLimitedFetch(url, options = {}) {
-        if (!checkRateLimit()) {
-            throw new Error('Rate limit exceeded');
+    // Enhanced update triggers with forced refreshes
+    async function triggerUIUpdate(action, data = {}) {
+        const currentPage = getCurrentPage();
+        debugLog(`[TRIGGER] 🚀 ${action} - forcing immediate UI update`);
+        
+        try {
+            switch (action) {
+                case 'ORDER_PLACED':
+                    await loadRecentOrders();
+                    if (currentPage === 'manager') {
+                        await loadOrders(); // Refresh manager to show new order
+                    }
+                    break;
+                    
+                case 'ORDER_STATUS_UPDATED':
+                    // Force refresh manager portal
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    
+                    // Update tracking page if viewing this order
+                    if (currentPage === 'tracking') {
+                        const trackingOrderId = getOrderIdFromUrl();
+                        if (trackingOrderId === data.orderId) {
+                            debugLog(`[TRIGGER] 📱 Immediately refreshing tracking page for order ${data.orderId}`);
+                            await loadOrderTracking();
+                        }
+                    }
+                    
+                    // Update cached tracking data
+                    if (data.orderId) {
+                        lastTrackingOrderData = `${data.orderId}-${data.newStatus}-${new Date().getTime()}`;
+                    }
+                    break;
+                    
+                case 'KITCHEN_STATUS_CHANGED':
+                    kitchenOpen = data.isOpen;
+                    
+                    // Update all pages immediately
+                    if (currentPage === 'manager') {
+                        updateKitchenButton();
+                        await loadOrders(); // Refresh orders in case status affects display
+                    } else if (currentPage === 'order') {
+                        updateOrderPageDisplay();
+                    }
+                    
+                    showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 2000);
+                    debugLog(`[TRIGGER] 🏪 Kitchen status updated to: ${data.isOpen}`);
+                    break;
+                    
+                case 'ORDERS_CLEARED':
+                    // Force refresh all views
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    
+                    if (currentPage === 'tracking') {
+                        debugLog(`[TRIGGER] 🗑️ Orders cleared, updating tracking page`);
+                        await loadOrderTracking();
+                    }
+                    break;
+                    
+                case 'ORDER_DELETED':
+                    // Force refresh manager portal
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    
+                    if (currentPage === 'tracking') {
+                        const trackingOrderId = getOrderIdFromUrl();
+                        if (trackingOrderId === data.orderId) {
+                            debugLog(`[TRIGGER] 🗑️ Order ${data.orderId} deleted, showing message on tracking page`);
+                            const trackingOrderDetails = document.getElementById('trackingOrderDetails');
+                            if (trackingOrderDetails) {
+                                trackingOrderDetails.innerHTML = `
+                                    <div class="error-message" style="display: block;">
+                                        This order has been deleted by a manager.
+                                    </div>
+                                `;
+                            }
+                        }
+                    }
+                    break;
+            }
+        } catch (error) {
+            debugLog(`[TRIGGER] ❌ Error in ${action}:`, error.message);
         }
-        
-        const startTime = performance.now();
-        const response = await fetch(url, options);
-        trackPerformance(startTime);
-        
-        return response;
     }
-    
+
+    // Enhanced API FUNCTIONS
     async function getOrders() {
+        const startTime = performance.now();
         try {
             debugLog('Fetching orders from /api/orders');
-            const response = await rateLimitedFetch('/api/orders');
+            const response = await fetch('/api/orders');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const orders = await response.json();
+            trackPerformance(startTime);
             debugLog('Orders received:', orders.length, 'orders');
             return { orders: Array.isArray(orders) ? orders : [] };
         } catch (error) {
@@ -578,10 +463,11 @@
     }
 
     async function addOrder(order) {
+        const startTime = performance.now();
         try {
             debugLog('Adding order:', order.food, 'for', order.name);
 
-            const response = await rateLimitedFetch('/api/orders', {
+            const response = await fetch('/api/orders', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -595,6 +481,7 @@
             }
 
             const result = await response.json();
+            trackPerformance(startTime);
             debugLog('Order added successfully:', result.order?.id);
             
             return result;
@@ -609,6 +496,7 @@
             const response = await getOrders();
             const order = response.orders.find(o => o.id === id);
             
+            // If not found in active orders, check recent orders
             if (!order) {
                 const recentResponse = await getRecentOrders();
                 const recentOrder = recentResponse.orders.find(o => o.id === id);
@@ -623,6 +511,7 @@
     }
 
     async function updateOrderStatus(id, status) {
+        const startTime = performance.now();
         try {
             const updateData = { status };
             if (status === 'completed') {
@@ -630,7 +519,7 @@
             }
 
             debugLog(`[API CALL] PUT /api/orders?update-order=${id} with status: ${status}`);
-            const response = await rateLimitedFetch(`/api/orders?update-order=${id}`, {
+            const response = await fetch(`/api/orders?update-order=${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -645,12 +534,8 @@
             }
             
             const result = await response.json();
+            trackPerformance(startTime);
             debugLog(`[API CALL] Success Response:`, result);
-            
-            // Clear cache to force refresh
-            lastDataCache.orders = null;
-            lastDataCache.recentOrders = null;
-            
             return result;
         } catch (error) {
             debugLog('[API CALL] Exception:', error);
@@ -680,11 +565,7 @@
             
             showMessage('success', `Order #${orderId} has been permanently deleted`);
             
-            // Force refresh
-            lastDataCache.orders = null;
-            lastDataCache.recentOrders = null;
-            await loadOrders();
-            await loadRecentOrders();
+            await triggerUIUpdate('ORDER_DELETED', { orderId });
             
             debugLog(`[DELETE ORDER] UI updated after deletion`);
             
@@ -703,9 +584,10 @@
     }
 
     async function deleteOrderFromAPI(orderId) {
+        const startTime = performance.now();
         try {
             debugLog(`[API CALL] DELETE /api/orders?delete-order=${orderId}`);
-            const response = await rateLimitedFetch(`/api/orders?delete-order=${orderId}`, {
+            const response = await fetch(`/api/orders?delete-order=${orderId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
@@ -719,6 +601,7 @@
             }
             
             const result = await response.json();
+            trackPerformance(startTime);
             debugLog(`[API CALL] Delete Success Response:`, result);
             return result;
         } catch (error) {
@@ -728,9 +611,10 @@
     }
 
     async function clearOrders() {
+        const startTime = performance.now();
         try {
             debugLog('Clearing all orders');
-            const response = await rateLimitedFetch('/api/orders', {
+            const response = await fetch('/api/orders', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -740,12 +624,8 @@
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
+            trackPerformance(startTime);
             debugLog('Orders cleared successfully');
-            
-            // Clear cache
-            lastDataCache.orders = null;
-            lastDataCache.recentOrders = null;
-            
             return result;
         } catch (error) {
             console.error('Failed to clear orders:', error.message);
@@ -754,11 +634,13 @@
     }
 
     async function getKitchenStatus() {
+        const startTime = performance.now();
         try {
             debugLog('Fetching kitchen status');
-            const response = await rateLimitedFetch('/api/orders?kitchen-status=true');
+            const response = await fetch('/api/orders?kitchen-status=true');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const status = await response.json();
+            trackPerformance(startTime);
             debugLog('Kitchen status:', status.isOpen ? 'Open' : 'Closed');
             return status;
         } catch (error) {
@@ -768,9 +650,10 @@
     }
 
     async function setKitchenStatus(isOpen) {
+        const startTime = performance.now();
         try {
             debugLog('Setting kitchen status to:', isOpen ? 'Open' : 'Closed');
-            const response = await rateLimitedFetch('/api/orders?kitchen-status=true', {
+            const response = await fetch('/api/orders?kitchen-status=true', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -780,11 +663,8 @@
 
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
+            trackPerformance(startTime);
             debugLog('Kitchen status updated successfully');
-            
-            // Clear cache
-            lastDataCache.kitchenStatus = null;
-            
             return result;
         } catch (error) {
             console.error('Failed to set kitchen status:', error.message);
@@ -793,11 +673,13 @@
     }
 
     async function getRecentOrders() {
+        const startTime = performance.now();
         try {
             debugLog('Fetching recent orders');
-            const response = await rateLimitedFetch('/api/orders?completed-orders=true');
+            const response = await fetch('/api/orders?completed-orders=true');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const orders = await response.json();
+            trackPerformance(startTime);
             debugLog('Recent orders received:', orders.length, 'orders');
             return { orders: Array.isArray(orders) ? orders : [] };
         } catch (error) {
@@ -806,8 +688,7 @@
         }
     }
 
-    // ========== KITCHEN STATUS MANAGEMENT ==========
-    
+    // Kitchen status management
     let kitchenOpen = false;
 
     async function toggleKitchenStatus() {
@@ -816,10 +697,9 @@
             kitchenOpen = !kitchenOpen;
             
             await setKitchenStatus(kitchenOpen);
-            updateKitchenButton();
-            updateOrderPageDisplay();
             
-            showMessage('success', `Kitchen ${kitchenOpen ? 'opened' : 'closed'}!`);
+            await triggerUIUpdate('KITCHEN_STATUS_CHANGED', { isOpen: kitchenOpen });
+            
             debugLog(`[KITCHEN] Status changed from ${previousStatus} to ${kitchenOpen}`);
             
         } catch (error) {
@@ -906,11 +786,11 @@
         }
     }
 
-    // ========== PAGE MANAGEMENT ==========
-    
     function showPage(pageName) {
-        stopSmartUpdates();
+        // Stop existing updates when changing pages
+        stopEventDrivenUpdates();
         
+        // Manager portal authentication
         if (pageName === 'manager') {
             if (!authenticateManager()) {
                 debugLog('[MANAGER ACCESS] Authentication failed');
@@ -930,66 +810,19 @@
             loadOrders();
             checkKitchenStatus();
             loadRecentOrders();
-            startSmartUpdates(); // Smart updates for new orders
+            startEventDrivenUpdates();
         } else if (pageName === 'tracking') {
             document.getElementById('trackingPage').classList.add('active');
             document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Track Your Order';
-            
-            // Add refresh button to tracking page if it doesn't exist
-            const trackingContainer = document.querySelector('#trackingPage .order-tracking');
-            if (trackingContainer && !trackingContainer.querySelector('.manual-refresh-btn')) {
-                const refreshBtn = document.createElement('button');
-                refreshBtn.className = 'manual-refresh-btn';
-                refreshBtn.style.cssText = `
-                    background: #17A2B8; 
-                    color: white; 
-                    border: 3px solid #000; 
-                    padding: 10px 20px; 
-                    border-radius: 8px; 
-                    cursor: pointer; 
-                    margin: 20px auto; 
-                    display: block;
-                    font-weight: 700;
-                    transition: all 0.3s ease;
-                `;
-                refreshBtn.textContent = '🔄 Refresh Status';
-                refreshBtn.onclick = manualRefresh;
-                trackingContainer.insertBefore(refreshBtn, trackingContainer.firstChild);
-            }
-            
             loadOrderTracking();
             loadRecentOrders();
-            startSmartUpdates(); // Smart updates for order status changes
+            startEventDrivenUpdates();
         } else {
             document.getElementById('orderPage').classList.add('active');
             document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering';
-            
-            // Add refresh button to order page if it doesn't exist
-            const orderContainer = document.getElementById('orderFormContainer');
-            if (orderContainer && !orderContainer.querySelector('.manual-refresh-btn')) {
-                const refreshBtn = document.createElement('button');
-                refreshBtn.className = 'manual-refresh-btn';
-                refreshBtn.style.cssText = `
-                    background: #17A2B8; 
-                    color: white; 
-                    border: 3px solid #000; 
-                    padding: 10px 20px; 
-                    border-radius: 8px; 
-                    cursor: pointer; 
-                    margin: 20px 0; 
-                    display: block;
-                    font-weight: 700;
-                    transition: all 0.3s ease;
-                    width: 100%;
-                `;
-                refreshBtn.textContent = '🔄 Refresh Kitchen Status';
-                refreshBtn.onclick = manualRefresh;
-                orderContainer.appendChild(refreshBtn);
-            }
-            
             checkKitchenStatus();
             loadRecentOrders();
-            // NO automatic updates for order page
+            startEventDrivenUpdates();
         }
     }
 
@@ -1003,8 +836,7 @@
         }
     }
 
-    // ========== MANAGER FUNCTIONS ==========
-    
+    // Manager functions
     async function loadOrders() {
         const loading = document.getElementById('loading');
         const container = document.getElementById('ordersContainer');
@@ -1019,11 +851,7 @@
             const orders = response.orders || [];
             
             if (loading) loading.style.display = 'none';
-            
-            // Update our tracking
-            if (lastDataCache) {
-                lastDataCache.lastOrderCount = orders.length;
-            }
+            lastOrderCount = orders.length;
             
             if (orders.length === 0) {
                 if (noOrdersMsg) noOrdersMsg.style.display = 'block';
@@ -1116,9 +944,7 @@
             
             showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
             
-            // Force refresh of orders
-            await loadOrders();
-            await loadRecentOrders();
+            await triggerUIUpdate('ORDER_STATUS_UPDATED', { orderId, newStatus });
             
             debugLog(`[UPDATE STATUS] UI updated for affected views`);
             
@@ -1149,9 +975,7 @@
             await clearOrders();
             showMessage('success', 'All orders cleared');
             
-            // Force refresh
-            await loadOrders();
-            await loadRecentOrders();
+            await triggerUIUpdate('ORDERS_CLEARED');
             
             debugLog(`[CLEAR ORDERS] All orders cleared and UI updated`);
             
@@ -1161,8 +985,7 @@
         }
     }
 
-    // ========== ORDER TRACKING FUNCTIONS ==========
-    
+    // Order tracking functions
     async function loadOrderTracking() {
         const orderId = getOrderIdFromUrl();
         if (!orderId) return;
@@ -1229,32 +1052,7 @@
         });
     }
 
-    // ========== MANUAL REFRESH FUNCTIONS ==========
-    
-    async function manualRefresh() {
-        const currentPage = getCurrentPage();
-        
-        try {
-            showMessage('success', 'Refreshing...', 1000);
-            
-            if (currentPage === 'tracking') {
-                await loadOrderTracking();
-            } else if (currentPage === 'order') {
-                await checkKitchenStatus();
-            }
-            
-            await loadRecentOrders();
-            
-            // Clear cache to force fresh data
-            lastDataCache.orders = null;
-            lastDataCache.recentOrders = null;
-            lastDataCache.kitchenStatus = null;
-            
-        } catch (error) {
-            showMessage('error', 'Failed to refresh. Please try again.');
-        }
-    }
-    
+    // Recent orders functions
     async function loadRecentOrders() {
         const recentContainer = document.getElementById('completedOrdersList');
         if (!recentContainer) return;
@@ -1285,30 +1083,23 @@
         }
     }
 
-    // ========== INITIALIZATION ==========
-    
+    // Initialize
     function init() {
         const currentPage = getCurrentPage();
         
         // Reset tracking variables
-        lastDataCache = {
-            orders: null,
-            recentOrders: null,
-            kitchenStatus: null,
-            lastUpdate: 0,
-            orderHashes: new Map(),
-            lastOrderCount: 0,
-            lastKitchenStatus: null,
-            orderStatuses: ''
-        };
+        lastOrderCount = 0;
+        lastDataHash = '';
+        lastTrackingOrderData = null;
+        lastKitchenStatus = null;
+        lastRecentOrdersHash = '';
         
         showPage(currentPage);
         
-        debugLog(`[INIT] Application initialized on ${currentPage} page with smart updates`);
+        debugLog(`[INIT] Application initialized on ${currentPage} page with enhanced real-time updates`);
     }
 
-    // ========== EVENT LISTENERS ==========
-    
+    // Enhanced Event Listeners
     function setupEventListeners() {
         // Order form handling
         const orderForm = document.getElementById('orderForm');
@@ -1334,9 +1125,7 @@
                     
                     debugLog(`[NEW ORDER] Order placed successfully: ${response.order?.id}`);
                     
-                    // Clear cache to ensure fresh data
-                    lastDataCache.orders = null;
-                    lastDataCache.recentOrders = null;
+                    await triggerUIUpdate('ORDER_PLACED', { orderId: response.order?.id });
                     
                     if (response.order && response.order.id) {
                         setTimeout(() => {
@@ -1348,14 +1137,10 @@
                     
                 } catch (error) {
                     console.error('Order submission error:', error.message);
-                    if (error.message.includes('Rate limit')) {
-                        showMessage('error', 'Please wait a moment before placing another order.');
-                    } else {
-                        const errorMessage = error.message?.includes('HTTP 500') 
-                            ? 'Server error. Please check your API configuration and try again.' 
-                            : 'Failed to place order. Please try again.';
-                        showMessage('error', errorMessage);
-                    }
+                    const errorMessage = error.message?.includes('HTTP 500') 
+                        ? 'Server error. Please check your API configuration and try again.' 
+                        : 'Failed to place order. Please try again.';
+                    showMessage('error', errorMessage);
                 } finally {
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Place Order';
@@ -1363,7 +1148,7 @@
             });
         }
 
-        // FIXED: Triple click detection for manager access
+        // Enhanced manager access functionality - Fixed triple click detection
         let clickCount = 0;
         let clickTimer = null;
         const header = document.querySelector('.header');
@@ -1382,25 +1167,18 @@
                     const managerLink = document.getElementById('managerAccess');
                     if (managerLink) {
                         managerLink.style.display = 'block';
-                        managerLink.style.opacity = '1';
-                        managerLink.style.transition = 'opacity 0.3s ease';
                         
-                        // Hide after 10 seconds instead of 5
+                        // Hide after 5 seconds
                         setTimeout(() => {
-                            if (managerLink.style.display === 'block') {
-                                managerLink.style.opacity = '0';
-                                setTimeout(() => {
-                                    managerLink.style.display = 'none';
-                                }, 300);
-                            }
-                        }, 10000);
+                            managerLink.style.display = 'none';
+                        }, 5000);
                     }
                     clickCount = 0; // Reset immediately
                 } else {
-                    // Set timer to reset click count after 800ms (reduced from 1000ms)
+                    // Set timer to reset click count after 1 second
                     clickTimer = setTimeout(() => {
                         clickCount = 0;
-                    }, 800);
+                    }, 1000);
                 }
             });
         }
@@ -1421,19 +1199,16 @@
         }
     }
 
-    // ========== GLOBAL FUNCTIONS ==========
-    
+    // Global function assignments for onclick handlers
     window.toggleKitchenStatus = toggleKitchenStatus;
     window.loadOrders = loadOrders;
     window.clearAllOrders = clearAllOrders;
     window.logoutManager = logoutManager;
     window.goToOrderPage = goToOrderPage;
-    window.manualRefresh = manualRefresh;
 
-    // ========== CLEANUP AND NAVIGATION ==========
-    
+    // Enhanced cleanup and navigation handling
     window.addEventListener('beforeunload', function() {
-        stopSmartUpdates();
+        stopEventDrivenUpdates();
         debugLog('[CLEANUP] Stopping updates before page unload');
     });
     
@@ -1445,44 +1220,35 @@
     // Handle visibility changes to pause/resume updates when tab is hidden/shown
     document.addEventListener('visibilitychange', function() {
         if (document.hidden) {
-            debugLog('[VISIBILITY] Tab hidden - smart updates will pause');
+            debugLog('[VISIBILITY] Tab hidden - updates will pause');
         } else {
-            debugLog('[VISIBILITY] Tab visible - smart updates will resume');
+            debugLog('[VISIBILITY] Tab visible - updates will resume');
             // Force a quick update when tab becomes visible again
-            setTimeout(async () => {
+            setTimeout(() => {
                 const currentPage = getCurrentPage();
-                if (currentPage === 'manager' || currentPage === 'tracking') {
-                    const changeData = await checkForChanges();
-                    if (changeData) {
-                        await fetchDataIfChanged(changeData);
-                    }
+                if (currentPage === 'manager') {
+                    loadOrders();
+                } else if (currentPage === 'tracking') {
+                    loadOrderTracking();
                 }
-            }, 1000);
+                loadRecentOrders();
+            }, 500);
         }
     });
     
-    // Show rate limit info on page load
-    setTimeout(() => {
-        if (DEBUG_MODE) {
-            console.log('📊 Rate Limits:', RATE_LIMITS);
-            console.log('⚡ Smart Update Interval:', CHANGE_CHECK_INTERVAL + 'ms');
-        }
-    }, 1000);
-    
-    // ========== INITIALIZE ==========
-    
+    // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             setupActivityTracking();
             setupEventListeners();
             init();
-            debugLog('[STARTUP] Application fully loaded with rate limiting and optimized updates');
+            debugLog('[STARTUP] Application fully loaded and initialized');
         });
     } else {
         setupActivityTracking();
         setupEventListeners();
         init();
-        debugLog('[STARTUP] Application fully loaded with rate limiting and optimized updates');
+        debugLog('[STARTUP] Application fully loaded and initialized');
     }
 
 })();
