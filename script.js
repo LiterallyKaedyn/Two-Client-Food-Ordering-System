@@ -381,10 +381,36 @@ FOOD_OPTIONS['New Food Item'] = {
         return btoa(dataString).slice(0, 20);
     }
     
-    // Enhanced sound notification system
+    // Enhanced sound notification system using uploaded bell sound
     function playNewOrderSound() {
         try {
-            // Create a more pleasant notification sound
+            const audio = new Audio('/assets/bell.mp3');
+            audio.volume = 0.7; // Set volume to 70%
+            
+            // Play the sound
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        debugLog('🔊 New order bell notification played');
+                    })
+                    .catch(error => {
+                        debugLog('🔇 Could not play bell notification:', error.message);
+                        // Fallback to generated sound if file fails
+                        playFallbackSound();
+                    });
+            }
+        } catch (error) {
+            debugLog('🔇 Could not load bell sound file:', error.message);
+            // Fallback to generated sound
+            playFallbackSound();
+        }
+    }
+    
+    // Fallback sound generation if bell.mp3 fails
+    function playFallbackSound() {
+        try {
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
@@ -403,9 +429,9 @@ FOOD_OPTIONS['New Food Item'] = {
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.3);
             
-            debugLog('🔊 New order notification sound played');
+            debugLog('🔊 Fallback notification sound played');
         } catch (error) {
-            debugLog('🔇 Could not play notification sound:', error.message);
+            debugLog('🔇 Could not play any notification sound:', error.message);
         }
     }
     
@@ -1375,7 +1401,7 @@ FOOD_OPTIONS['New Food Item'] = {
             });
         }
 
-        // FIXED: Triple click detection for manager access
+        // ENHANCED: Triple click detection for direct manager authentication
         let clickCount = 0;
         let clickTimer = null;
         const header = document.querySelector('.header');
@@ -1388,26 +1414,18 @@ FOOD_OPTIONS['New Food Item'] = {
                     clearTimeout(clickTimer);
                 }
                 
-                // Check for triple click
+                // Check for triple click - go directly to authentication
                 if (clickCount === 3) {
-                    debugLog('[MANAGER ACCESS] Triple click detected - showing manager link');
-                    const managerLink = document.getElementById('managerAccess');
-                    if (managerLink) {
-                        managerLink.style.display = 'block';
-                        managerLink.style.opacity = '1';
-                        managerLink.style.transition = 'opacity 0.3s ease';
-                        
-                        // Hide after 10 seconds
-                        setTimeout(() => {
-                            if (managerLink.style.display === 'block') {
-                                managerLink.style.opacity = '0';
-                                setTimeout(() => {
-                                    managerLink.style.display = 'none';
-                                }, 300);
-                            }
-                        }, 10000);
-                    }
+                    debugLog('[MANAGER ACCESS] Triple click detected - attempting direct authentication');
                     clickCount = 0; // Reset immediately
+                    
+                    // Go directly to manager authentication
+                    if (authenticateManager()) {
+                        debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
+                        window.location.href = '?page=manager';
+                    } else {
+                        debugLog('[MANAGER ACCESS] Authentication failed');
+                    }
                 } else {
                     // Set timer to reset click count after 800ms
                     clickTimer = setTimeout(() => {
@@ -1417,18 +1435,23 @@ FOOD_OPTIONS['New Food Item'] = {
             });
         }
 
-        // Manager access link click handler
+        // Manager access link (now optional - triple click goes direct)
         const managerLink = document.getElementById('managerAccess');
         if (managerLink) {
             managerLink.addEventListener('click', function(e) {
                 e.preventDefault();
-                debugLog('[MANAGER ACCESS] Manager link clicked');
+                debugLog('[MANAGER ACCESS] Manager link clicked - going to authentication');
                 
                 // Hide the link immediately
                 this.style.display = 'none';
                 
-                // Navigate to manager page
-                window.location.href = '?page=manager';
+                // Go directly to manager authentication
+                if (authenticateManager()) {
+                    debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
+                    window.location.href = '?page=manager';
+                } else {
+                    debugLog('[MANAGER ACCESS] Authentication failed');
+                }
             });
         }
     }
@@ -1478,8 +1501,9 @@ FOOD_OPTIONS['New Food Item'] = {
             console.log('🔄 Manager page: 20 seconds (was 3 seconds)');
             console.log('📱 Tracking page: 15 seconds (was 2 seconds)');
             console.log('📝 Order page: 1 minute (was 5 seconds)');
-            console.log('🔊 Sound notifications enabled for new orders');
+            console.log('🔔 Bell sound notifications enabled (/assets/bell.mp3)');
             console.log('🍔 Enhanced food selection system enabled');
+            console.log('🖱️ Triple-click header for direct manager authentication');
         }
     }, 1000);
     
