@@ -165,6 +165,82 @@
             transform: translateY(-2px);
         }
 
+        /* Enhanced Food Selection Styles */
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .checkbox-item:hover {
+            background: #e9ecef;
+            border-color: #FF6B35;
+            transform: translateY(-1px);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            accent-color: #FF6B35;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            margin-bottom: 0;
+            font-weight: 500;
+            cursor: pointer;
+            flex: 1;
+            color: #000;
+        }
+
+        .checkbox-item input[type="checkbox"]:checked + label {
+            color: #FF6B35;
+            font-weight: 600;
+        }
+
+        /* Ensure dynamic options inherit form styling */
+        #foodOptions select {
+            width: 100%;
+            padding: 15px;
+            border: 3px solid #000;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: white;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-weight: 500;
+        }
+
+        #foodOptions select:focus {
+            outline: none;
+            border-color: #FF6B35;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.2);
+            transform: translateY(-2px);
+        }
+
+        #foodOptions label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            color: #000;
+            font-size: 1.1em;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
         .submit-btn {
             width: 100%;
             padding: 18px;
@@ -608,6 +684,10 @@
             .header p {
                 font-size: 1em;
             }
+
+            .checkbox-group {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -649,6 +729,8 @@
                                     <option value="Fruit">Fruit</option>
                                 </select>
                             </div>
+
+                            <!-- Dynamic options will be inserted here -->
 
                             <div class="form-group">
                                 <label for="comments">Special requests / Allergies (Optional):</label>

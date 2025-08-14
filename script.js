@@ -1,8 +1,49 @@
-// script.js - Complete Food Ordering System
-// Reduced request frequency with sound notifications
+// script.js - Complete Food Ordering System with Enhanced Food Selection
+// Reduced request frequency with sound notifications and dynamic food options
 
 (function() {
     'use strict';
+    
+    // ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
+    
+    // Easy-to-edit food configuration
+    const FOOD_OPTIONS = {
+        'Coco Pops': {
+            type: 'single',
+            label: 'Milk Type',
+            options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
+        },
+        'Cornflakes': {
+            type: 'single',
+            label: 'Milk Type',
+            options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
+        },
+        'Toast': {
+            type: 'single',
+            label: 'Spread (with optional margarine)',
+            options: ['Jam + Margarine', 'Jam (no margarine)', 'Nutella + Margarine', 'Nutella (no margarine)', 'Marmite + Margarine', 'Marmite (no margarine)', 'Just Margarine']
+        },
+        'Nachos': {
+            type: 'single',
+            label: 'Type',
+            options: ['Vegan Nachos', 'Beef Nachos']
+        },
+        'Chicken Wraps': {
+            type: 'multiple',
+            label: 'Sauces (select all that apply)',
+            options: ['Sweet Chilli', 'Mayo', 'Tomato Sauce', 'Barbecue Sauce']
+        },
+        'Ice Cream': {
+            type: 'single',
+            label: 'Flavour',
+            options: ['Vanilla', 'Chocolate']
+        },
+        'Fruit': {
+            type: 'single',
+            label: 'Type of Fruit',
+            options: ['Banana', 'Orange', 'Apple', 'Pear', 'Grapes']
+        }
+    };
     
     // ========== AUTHENTICATION SYSTEM ==========
     
@@ -142,6 +183,106 @@
                 }
             }
         }, 60000);
+    }
+    
+    // ========== ENHANCED FOOD SELECTION SYSTEM ==========
+    
+    // Function to generate dynamic options HTML
+    function generateOptionsHTML(foodItem) {
+        const config = FOOD_OPTIONS[foodItem];
+        if (!config) return '';
+
+        let html = `
+            <div class="form-group" id="foodOptions">
+                <label for="foodSubOptions">${config.label}:</label>
+        `;
+
+        if (config.type === 'single') {
+            html += '<select id="foodSubOptions" name="foodSubOptions" required>';
+            html += '<option value="">Select an option...</option>';
+            config.options.forEach(option => {
+                html += `<option value="${option}">${option}</option>`;
+            });
+            html += '</select>';
+        } else if (config.type === 'multiple') {
+            html += '<div class="checkbox-group">';
+            config.options.forEach((option, index) => {
+                html += `
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="option${index}" name="foodSubOptions" value="${option}">
+                        <label for="option${index}">${option}</label>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    // Function to update the order form when food selection changes
+    function updateFoodOptions() {
+        const foodSelect = document.getElementById('food');
+        const existingOptions = document.getElementById('foodOptions');
+        
+        // Remove existing options
+        if (existingOptions) {
+            existingOptions.remove();
+        }
+
+        const selectedFood = foodSelect.value;
+        if (selectedFood && FOOD_OPTIONS[selectedFood]) {
+            const optionsHTML = generateOptionsHTML(selectedFood);
+            
+            // Insert after the food selection
+            foodSelect.closest('.form-group').insertAdjacentHTML('afterend', optionsHTML);
+        }
+    }
+
+    // Function to get selected sub-options for form submission
+    function getSelectedSubOptions() {
+        const foodSelect = document.getElementById('food');
+        const selectedFood = foodSelect.value;
+        
+        if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
+            return '';
+        }
+        
+        const config = FOOD_OPTIONS[selectedFood];
+        
+        if (config.type === 'single') {
+            const selectElement = document.getElementById('foodSubOptions');
+            return selectElement ? selectElement.value : '';
+        } else if (config.type === 'multiple') {
+            const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+            return selected.length > 0 ? selected.join(', ') : '';
+        }
+        
+        return '';
+    }
+
+    // Function to add easy management interface (for development/admin)
+    function addFoodManagementInterface() {
+        // Only show in development or if debug mode is on
+        if (!DEBUG_MODE) return;
+        
+        console.log('🍔 FOOD OPTIONS CONFIGURATION:');
+        console.log('To modify food options, edit the FOOD_OPTIONS object in script.js');
+        console.log('Current configuration:', FOOD_OPTIONS);
+        console.log(`
+Available food types:
+- 'single': Radio button selection (one choice)
+- 'multiple': Checkbox selection (multiple choices)
+
+Example configuration:
+FOOD_OPTIONS['New Food Item'] = {
+    type: 'single',
+    label: 'Choose an option',
+    options: ['Option 1', 'Option 2', 'Option 3']
+};
+        `);
     }
     
     // ========== MAIN APPLICATION ==========
@@ -1141,6 +1282,20 @@
         }
     }
 
+    // Initialize enhanced food system
+    function initEnhancedFoodSystem() {
+        // Add event listener to food dropdown
+        const foodSelect = document.getElementById('food');
+        if (foodSelect) {
+            foodSelect.addEventListener('change', updateFoodOptions);
+        }
+        
+        // Add management interface in debug mode
+        addFoodManagementInterface();
+        
+        debugLog('🍔 Enhanced food selection system initialized');
+    }
+
     // Initialize
     function init() {
         const currentPage = getCurrentPage();
@@ -1159,7 +1314,7 @@
 
     // Enhanced Event Listeners
     function setupEventListeners() {
-        // Order form handling
+        // Enhanced order form handling with food options
         const orderForm = document.getElementById('orderForm');
         if (orderForm) {
             orderForm.addEventListener('submit', async function(e) {
@@ -1171,8 +1326,16 @@
                 
                 try {
                     const formData = new FormData(this);
+                    const selectedSubOptions = getSelectedSubOptions();
+                    
+                    // Build the complete food description
+                    let foodDescription = formData.get('food');
+                    if (selectedSubOptions) {
+                        foodDescription += ` (${selectedSubOptions})`;
+                    }
+                    
                     const order = {
-                        food: formData.get('food'),
+                        food: foodDescription,
                         room: formData.get('room'),
                         name: formData.get('name'),
                         comments: formData.get('comments') || ''
@@ -1181,7 +1344,13 @@
                     const response = await addOrder(order);
                     this.reset();
                     
-                    debugLog(`[NEW ORDER] Order placed successfully: ${response.order?.id}`);
+                    // Clear dynamic options
+                    const existingOptions = document.getElementById('foodOptions');
+                    if (existingOptions) {
+                        existingOptions.remove();
+                    }
+                    
+                    debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id}`);
                     
                     await triggerUIUpdate('ORDER_PLACED', { orderId: response.order?.id });
                     
@@ -1310,6 +1479,7 @@
             console.log('📱 Tracking page: 15 seconds (was 2 seconds)');
             console.log('📝 Order page: 1 minute (was 5 seconds)');
             console.log('🔊 Sound notifications enabled for new orders');
+            console.log('🍔 Enhanced food selection system enabled');
         }
     }, 1000);
     
@@ -1318,14 +1488,16 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupActivityTracking();
             setupEventListeners();
+            initEnhancedFoodSystem();
             init();
-            debugLog('[STARTUP] Application fully loaded with reduced-frequency updates and sound notifications');
+            debugLog('[STARTUP] Application fully loaded with enhanced food selection system');
         });
     } else {
         setupActivityTracking();
         setupEventListeners();
+        initEnhancedFoodSystem();
         init();
-        debugLog('[STARTUP] Application fully loaded with reduced-frequency updates and sound notifications');
+        debugLog('[STARTUP] Application fully loaded with enhanced food selection system');
     }
 
 })();
