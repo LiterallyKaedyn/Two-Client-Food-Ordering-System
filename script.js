@@ -1,5 +1,5 @@
 // script.js - Complete Food Ordering System
-// All application logic and authentication
+// All application logic and authentication with enhanced real-time updates
 
 (function() {
     'use strict';
@@ -233,18 +233,31 @@
     }
     
     function startEventDrivenUpdates() {
+        // Clear any existing interval
+        if (updateCheckInterval) {
+            clearInterval(updateCheckInterval);
+        }
+        
+        const currentPage = getCurrentPage();
+        // Set different intervals based on page for optimal performance
+        const intervalTime = currentPage === 'tracking' ? 2000 : 
+                           currentPage === 'manager' ? 3000 : 5000;
+        
+        debugLog(`[REAL-TIME] Starting updates for ${currentPage} page (${intervalTime}ms interval)`);
+        
         updateCheckInterval = setInterval(async () => {
-            if (document.hidden) return;
+            if (document.hidden) return; // Don't update when tab is hidden
             
             const startTime = performance.now();
             
             try {
                 const currentPage = getCurrentPage();
                 
+                // Fetch all data in parallel for efficiency
                 const [ordersResp, recentResp, kitchenResp] = await Promise.all([
-                    fetch('/api/orders').then(r => r.json()),
-                    fetch('/api/orders?completed-orders=true').then(r => r.json()),
-                    fetch('/api/orders?kitchen-status=true').then(r => r.json())
+                    fetch('/api/orders').then(r => r.json()).catch(() => []),
+                    fetch('/api/orders?completed-orders=true').then(r => r.json()).catch(() => []),
+                    fetch('/api/orders?kitchen-status=true').then(r => r.json()).catch(() => ({ isOpen: false }))
                 ]);
                 
                 trackPerformance(startTime);
@@ -252,14 +265,18 @@
                 const currentHash = calculateDataHash(ordersResp, recentResp, kitchenResp.isOpen);
                 
                 let hasChanges = false;
+                let shouldForceRefresh = false;
                 
-                // Kitchen status change detection
+                // Kitchen status change detection with immediate refresh
                 if (lastKitchenStatus !== null && kitchenResp.isOpen !== lastKitchenStatus) {
-                    debugLog(`[REAL-TIME] Kitchen status changed: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
+                    debugLog(`[REAL-TIME] 🔄 Kitchen status changed: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
                     kitchenOpen = kitchenResp.isOpen;
+                    shouldForceRefresh = true;
                     
+                    // Update all relevant UI components immediately
                     if (currentPage === 'manager') {
                         updateKitchenButton();
+                        await loadOrders(); // Force refresh manager orders
                     } else if (currentPage === 'order') {
                         updateOrderPageDisplay();
                     }
@@ -269,15 +286,24 @@
                 }
                 lastKitchenStatus = kitchenResp.isOpen;
                 
-                // Order count change detection
+                // Order count change detection with new order notification
                 if (lastOrderCount > 0 && ordersResp.length > lastOrderCount && currentPage === 'manager') {
-                    debugLog(`[REAL-TIME] New orders detected: ${lastOrderCount} → ${ordersResp.length}`);
+                    const newOrdersCount = ordersResp.length - lastOrderCount;
+                    debugLog(`[REAL-TIME] 🔔 New orders detected: ${lastOrderCount} → ${ordersResp.length} (+${newOrdersCount})`);
                     showNewOrderNotification();
+                    shouldForceRefresh = true;
                     hasChanges = true;
                 }
-                lastOrderCount = ordersResp.length;
+                lastOrderCount = Array.isArray(ordersResp) ? ordersResp.length : 0;
                 
-                // Tracking page monitoring
+                // Order status changes detection
+                if (currentHash !== lastDataHash && lastDataHash !== '') {
+                    debugLog(`[REAL-TIME] 📊 Data changes detected, forcing refresh`);
+                    shouldForceRefresh = true;
+                    hasChanges = true;
+                }
+                
+                // Tracking page specific monitoring
                 if (currentPage === 'tracking') {
                     const trackingOrderId = getOrderIdFromUrl();
                     const currentOrder = ordersResp.find(o => o.id === trackingOrderId) || 
@@ -288,7 +314,7 @@
                         'not-found';
                     
                     if (lastTrackingOrderData && currentOrderData !== lastTrackingOrderData) {
-                        debugLog(`[REAL-TIME] Tracked order ${trackingOrderId} changed, updating immediately`);
+                        debugLog(`[REAL-TIME] 📱 Tracked order ${trackingOrderId} changed, updating immediately`);
                         await loadOrderTracking();
                         hasChanges = true;
                     }
@@ -296,115 +322,126 @@
                     lastTrackingOrderData = currentOrderData;
                 }
                 
-                // General data change detection
-                if (currentHash !== lastDataHash && lastDataHash !== '') {
-                    debugLog(`[REAL-TIME] General data changes detected, updating views`);
-                    hasChanges = true;
-                    
-                    if (currentPage === 'manager') {
-                        await loadOrders();
-                    }
-                    
+                // Force refresh manager portal on any significant change
+                if (shouldForceRefresh && currentPage === 'manager') {
+                    debugLog(`[REAL-TIME] 🔄 Force refreshing manager portal`);
+                    await loadOrders();
+                }
+                
+                // Always update recent orders if there are changes
+                if (hasChanges) {
                     await loadRecentOrders();
                 }
                 
                 lastDataHash = currentHash;
                 
                 if (hasChanges) {
-                    debugLog(`[REAL-TIME] Changes processed for ${currentPage} page`);
+                    debugLog(`[REAL-TIME] ✅ Changes processed for ${currentPage} page`);
                 }
                 
             } catch (error) {
-                debugLog('Real-time update error:', error.message);
+                debugLog('[REAL-TIME] ❌ Update error:', error.message);
             }
-        }, getCurrentPage() === 'tracking' ? 3000 : getCurrentPage() === 'order' ? 8000 : 15000);
+        }, intervalTime);
     }
     
     function stopEventDrivenUpdates() {
         if (updateCheckInterval) {
             clearInterval(updateCheckInterval);
             updateCheckInterval = null;
+            debugLog('[REAL-TIME] Updates stopped');
         }
     }
 
-    // Enhanced update triggers
+    // Enhanced update triggers with forced refreshes
     async function triggerUIUpdate(action, data = {}) {
         const currentPage = getCurrentPage();
-        debugLog(`[TRIGGER] ${action} - updating UI immediately`);
+        debugLog(`[TRIGGER] 🚀 ${action} - forcing immediate UI update`);
         
-        switch (action) {
-            case 'ORDER_PLACED':
-                await loadRecentOrders();
-                break;
-                
-            case 'ORDER_STATUS_UPDATED':
-                if (currentPage === 'manager') {
-                    await loadOrders();
-                }
-                await loadRecentOrders();
-                
-                if (currentPage === 'tracking') {
-                    const trackingOrderId = getOrderIdFromUrl();
-                    if (trackingOrderId === data.orderId) {
-                        debugLog(`[TRIGGER] Immediately refreshing tracking page for order ${data.orderId}`);
-                        await loadOrderTracking();
+        try {
+            switch (action) {
+                case 'ORDER_PLACED':
+                    await loadRecentOrders();
+                    if (currentPage === 'manager') {
+                        await loadOrders(); // Refresh manager to show new order
                     }
-                }
-                
-                if (data.orderId) {
-                    const trackingOrderId = getOrderIdFromUrl();
-                    if (trackingOrderId === data.orderId) {
-                        lastTrackingOrderData = `${data.orderId}-${data.newStatus}-${new Date().getTime()}`;
+                    break;
+                    
+                case 'ORDER_STATUS_UPDATED':
+                    // Force refresh manager portal
+                    if (currentPage === 'manager') {
+                        await loadOrders();
                     }
-                }
-                break;
-                
-            case 'KITCHEN_STATUS_CHANGED':
-                kitchenOpen = data.isOpen;
-                
-                if (currentPage === 'manager') {
-                    updateKitchenButton();
-                } else if (currentPage === 'order') {
-                    updateOrderPageDisplay();
-                }
-                
-                showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 1000);
-                debugLog(`[TRIGGER] Kitchen status updated to: ${data.isOpen}`);
-                break;
-                
-            case 'ORDERS_CLEARED':
-                if (currentPage === 'manager') {
-                    await loadOrders();
-                }
-                await loadRecentOrders();
-                
-                if (currentPage === 'tracking') {
-                    debugLog(`[TRIGGER] Orders cleared, updating tracking page`);
-                    await loadOrderTracking();
-                }
-                break;
-                
-            case 'ORDER_DELETED':
-                if (currentPage === 'manager') {
-                    await loadOrders();
-                }
-                await loadRecentOrders();
-                
-                if (currentPage === 'tracking') {
-                    const trackingOrderId = getOrderIdFromUrl();
-                    if (trackingOrderId === data.orderId) {
-                        debugLog(`[TRIGGER] Order ${data.orderId} deleted, showing message on tracking page`);
-                        const trackingOrderDetails = document.getElementById('trackingOrderDetails');
-                        if (trackingOrderDetails) {
-                            trackingOrderDetails.innerHTML = `
-                                <div class="error-message" style="display: block;">
-                                    This order has been deleted by a manager.
-                                </div>
-                            `;
+                    await loadRecentOrders();
+                    
+                    // Update tracking page if viewing this order
+                    if (currentPage === 'tracking') {
+                        const trackingOrderId = getOrderIdFromUrl();
+                        if (trackingOrderId === data.orderId) {
+                            debugLog(`[TRIGGER] 📱 Immediately refreshing tracking page for order ${data.orderId}`);
+                            await loadOrderTracking();
                         }
                     }
-                }
-                break;
+                    
+                    // Update cached tracking data
+                    if (data.orderId) {
+                        lastTrackingOrderData = `${data.orderId}-${data.newStatus}-${new Date().getTime()}`;
+                    }
+                    break;
+                    
+                case 'KITCHEN_STATUS_CHANGED':
+                    kitchenOpen = data.isOpen;
+                    
+                    // Update all pages immediately
+                    if (currentPage === 'manager') {
+                        updateKitchenButton();
+                        await loadOrders(); // Refresh orders in case status affects display
+                    } else if (currentPage === 'order') {
+                        updateOrderPageDisplay();
+                    }
+                    
+                    showMessage('success', `Kitchen ${data.isOpen ? 'opened' : 'closed'}!`, 2000);
+                    debugLog(`[TRIGGER] 🏪 Kitchen status updated to: ${data.isOpen}`);
+                    break;
+                    
+                case 'ORDERS_CLEARED':
+                    // Force refresh all views
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    
+                    if (currentPage === 'tracking') {
+                        debugLog(`[TRIGGER] 🗑️ Orders cleared, updating tracking page`);
+                        await loadOrderTracking();
+                    }
+                    break;
+                    
+                case 'ORDER_DELETED':
+                    // Force refresh manager portal
+                    if (currentPage === 'manager') {
+                        await loadOrders();
+                    }
+                    await loadRecentOrders();
+                    
+                    if (currentPage === 'tracking') {
+                        const trackingOrderId = getOrderIdFromUrl();
+                        if (trackingOrderId === data.orderId) {
+                            debugLog(`[TRIGGER] 🗑️ Order ${data.orderId} deleted, showing message on tracking page`);
+                            const trackingOrderDetails = document.getElementById('trackingOrderDetails');
+                            if (trackingOrderDetails) {
+                                trackingOrderDetails.innerHTML = `
+                                    <div class="error-message" style="display: block;">
+                                        This order has been deleted by a manager.
+                                    </div>
+                                `;
+                            }
+                        }
+                    }
+                    break;
+            }
+        } catch (error) {
+            debugLog(`[TRIGGER] ❌ Error in ${action}:`, error.message);
         }
     }
 
@@ -458,6 +495,14 @@
         try {
             const response = await getOrders();
             const order = response.orders.find(o => o.id === id);
+            
+            // If not found in active orders, check recent orders
+            if (!order) {
+                const recentResponse = await getRecentOrders();
+                const recentOrder = recentResponse.orders.find(o => o.id === id);
+                return { order: recentOrder };
+            }
+            
             return { order };
         } catch (error) {
             console.error('Failed to get order:', error.message);
@@ -742,6 +787,9 @@
     }
 
     function showPage(pageName) {
+        // Stop existing updates when changing pages
+        stopEventDrivenUpdates();
+        
         // Manager portal authentication
         if (pageName === 'manager') {
             if (!authenticateManager()) {
@@ -1039,6 +1087,7 @@
     function init() {
         const currentPage = getCurrentPage();
         
+        // Reset tracking variables
         lastOrderCount = 0;
         lastDataHash = '';
         lastTrackingOrderData = null;
@@ -1050,7 +1099,7 @@
         debugLog(`[INIT] Application initialized on ${currentPage} page with enhanced real-time updates`);
     }
 
-    // Event Listeners
+    // Enhanced Event Listeners
     function setupEventListeners() {
         // Order form handling
         const orderForm = document.getElementById('orderForm');
@@ -1099,20 +1148,53 @@
             });
         }
 
-        // Manager access link
+        // Enhanced manager access functionality - Fixed triple click detection
         let clickCount = 0;
+        let clickTimer = null;
         const header = document.querySelector('.header');
         if (header) {
             header.addEventListener('click', function() {
                 clickCount++;
-                if (clickCount === 3) {
-                    document.getElementById('managerAccess').style.display = 'block';
-                    setTimeout(() => {
-                        document.getElementById('managerAccess').style.display = 'none';
-                        clickCount = 0;
-                    }, 5000);
+                
+                // Clear existing timer
+                if (clickTimer) {
+                    clearTimeout(clickTimer);
                 }
-                setTimeout(() => { clickCount = 0; }, 1000);
+                
+                // Check for triple click
+                if (clickCount === 3) {
+                    debugLog('[MANAGER ACCESS] Triple click detected - showing manager link');
+                    const managerLink = document.getElementById('managerAccess');
+                    if (managerLink) {
+                        managerLink.style.display = 'block';
+                        
+                        // Hide after 5 seconds
+                        setTimeout(() => {
+                            managerLink.style.display = 'none';
+                        }, 5000);
+                    }
+                    clickCount = 0; // Reset immediately
+                } else {
+                    // Set timer to reset click count after 1 second
+                    clickTimer = setTimeout(() => {
+                        clickCount = 0;
+                    }, 1000);
+                }
+            });
+        }
+
+        // Manager access link click handler
+        const managerLink = document.getElementById('managerAccess');
+        if (managerLink) {
+            managerLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                debugLog('[MANAGER ACCESS] Manager link clicked');
+                
+                // Hide the link immediately
+                this.style.display = 'none';
+                
+                // Navigate to manager page
+                window.location.href = '?page=manager';
             });
         }
     }
@@ -1124,9 +1206,35 @@
     window.logoutManager = logoutManager;
     window.goToOrderPage = goToOrderPage;
 
-    // Clean up intervals when page unloads
-    window.addEventListener('beforeunload', stopEventDrivenUpdates);
-    window.addEventListener('popstate', init);
+    // Enhanced cleanup and navigation handling
+    window.addEventListener('beforeunload', function() {
+        stopEventDrivenUpdates();
+        debugLog('[CLEANUP] Stopping updates before page unload');
+    });
+    
+    window.addEventListener('popstate', function() {
+        debugLog('[NAVIGATION] Popstate detected - reinitializing');
+        init();
+    });
+    
+    // Handle visibility changes to pause/resume updates when tab is hidden/shown
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            debugLog('[VISIBILITY] Tab hidden - updates will pause');
+        } else {
+            debugLog('[VISIBILITY] Tab visible - updates will resume');
+            // Force a quick update when tab becomes visible again
+            setTimeout(() => {
+                const currentPage = getCurrentPage();
+                if (currentPage === 'manager') {
+                    loadOrders();
+                } else if (currentPage === 'tracking') {
+                    loadOrderTracking();
+                }
+                loadRecentOrders();
+            }, 500);
+        }
+    });
     
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
@@ -1134,11 +1242,13 @@
             setupActivityTracking();
             setupEventListeners();
             init();
+            debugLog('[STARTUP] Application fully loaded and initialized');
         });
     } else {
         setupActivityTracking();
         setupEventListeners();
         init();
+        debugLog('[STARTUP] Application fully loaded and initialized');
     }
 
 })();
