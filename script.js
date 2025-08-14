@@ -934,12 +934,59 @@
         } else if (pageName === 'tracking') {
             document.getElementById('trackingPage').classList.add('active');
             document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Track Your Order';
+            
+            // Add refresh button to tracking page if it doesn't exist
+            const trackingContainer = document.querySelector('#trackingPage .order-tracking');
+            if (trackingContainer && !trackingContainer.querySelector('.manual-refresh-btn')) {
+                const refreshBtn = document.createElement('button');
+                refreshBtn.className = 'manual-refresh-btn';
+                refreshBtn.style.cssText = `
+                    background: #17A2B8; 
+                    color: white; 
+                    border: 3px solid #000; 
+                    padding: 10px 20px; 
+                    border-radius: 8px; 
+                    cursor: pointer; 
+                    margin: 20px auto; 
+                    display: block;
+                    font-weight: 700;
+                    transition: all 0.3s ease;
+                `;
+                refreshBtn.textContent = '🔄 Refresh Status';
+                refreshBtn.onclick = manualRefresh;
+                trackingContainer.insertBefore(refreshBtn, trackingContainer.firstChild);
+            }
+            
             loadOrderTracking();
             loadRecentOrders();
             startSmartUpdates(); // Smart updates for order status changes
         } else {
             document.getElementById('orderPage').classList.add('active');
             document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering';
+            
+            // Add refresh button to order page if it doesn't exist
+            const orderContainer = document.getElementById('orderFormContainer');
+            if (orderContainer && !orderContainer.querySelector('.manual-refresh-btn')) {
+                const refreshBtn = document.createElement('button');
+                refreshBtn.className = 'manual-refresh-btn';
+                refreshBtn.style.cssText = `
+                    background: #17A2B8; 
+                    color: white; 
+                    border: 3px solid #000; 
+                    padding: 10px 20px; 
+                    border-radius: 8px; 
+                    cursor: pointer; 
+                    margin: 20px 0; 
+                    display: block;
+                    font-weight: 700;
+                    transition: all 0.3s ease;
+                    width: 100%;
+                `;
+                refreshBtn.textContent = '🔄 Refresh Kitchen Status';
+                refreshBtn.onclick = manualRefresh;
+                orderContainer.appendChild(refreshBtn);
+            }
+            
             checkKitchenStatus();
             loadRecentOrders();
             // NO automatic updates for order page
@@ -972,7 +1019,11 @@
             const orders = response.orders || [];
             
             if (loading) loading.style.display = 'none';
-            lastOrderCount = orders.length;
+            
+            // Update our tracking
+            if (lastDataCache) {
+                lastDataCache.lastOrderCount = orders.length;
+            }
             
             if (orders.length === 0) {
                 if (noOrdersMsg) noOrdersMsg.style.display = 'block';
@@ -1178,7 +1229,31 @@
         });
     }
 
-    // ========== RECENT ORDERS FUNCTIONS ==========
+    // ========== MANUAL REFRESH FUNCTIONS ==========
+    
+    async function manualRefresh() {
+        const currentPage = getCurrentPage();
+        
+        try {
+            showMessage('success', 'Refreshing...', 1000);
+            
+            if (currentPage === 'tracking') {
+                await loadOrderTracking();
+            } else if (currentPage === 'order') {
+                await checkKitchenStatus();
+            }
+            
+            await loadRecentOrders();
+            
+            // Clear cache to force fresh data
+            lastDataCache.orders = null;
+            lastDataCache.recentOrders = null;
+            lastDataCache.kitchenStatus = null;
+            
+        } catch (error) {
+            showMessage('error', 'Failed to refresh. Please try again.');
+        }
+    }
     
     async function loadRecentOrders() {
         const recentContainer = document.getElementById('completedOrdersList');
@@ -1216,17 +1291,20 @@
         const currentPage = getCurrentPage();
         
         // Reset tracking variables
-        lastOrderCount = 0;
         lastDataCache = {
             orders: null,
             recentOrders: null,
             kitchenStatus: null,
-            lastUpdate: 0
+            lastUpdate: 0,
+            orderHashes: new Map(),
+            lastOrderCount: 0,
+            lastKitchenStatus: null,
+            orderStatuses: ''
         };
         
         showPage(currentPage);
         
-        debugLog(`[INIT] Application initialized on ${currentPage} page with optimized updates`);
+        debugLog(`[INIT] Application initialized on ${currentPage} page with smart updates`);
     }
 
     // ========== EVENT LISTENERS ==========
@@ -1350,6 +1428,7 @@
     window.clearAllOrders = clearAllOrders;
     window.logoutManager = logoutManager;
     window.goToOrderPage = goToOrderPage;
+    window.manualRefresh = manualRefresh;
 
     // ========== CLEANUP AND NAVIGATION ==========
     
@@ -1386,7 +1465,7 @@
     setTimeout(() => {
         if (DEBUG_MODE) {
             console.log('📊 Rate Limits:', RATE_LIMITS);
-            console.log('⚡ Update Intervals:', UPDATE_INTERVALS);
+            console.log('⚡ Smart Update Interval:', CHANGE_CHECK_INTERVAL + 'ms');
         }
     }, 1000);
     
