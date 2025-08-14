@@ -406,16 +406,20 @@ FOOD_OPTIONS['New Food Item'] = {
                 
             case 'KITCHEN_STATUS_CHANGED':
                 debugLog(`🏪 Kitchen status changed to: ${event.data.isOpen ? 'OPEN' : 'CLOSED'}`);
+                const previousKitchenStatus = kitchenOpen;
                 kitchenOpen = event.data.isOpen;
                 
+                // Always update button when kitchen status changes
+                updateKitchenButton();
+                
                 if (currentPage === 'manager') {
-                    updateKitchenButton();
                     loadOrders();
                 } else if (currentPage === 'order') {
                     updateOrderPageDisplay();
                 }
                 
                 showMessage('success', `Kitchen ${event.data.isOpen ? 'opened' : 'closed'}!`, 3000);
+                debugLog(`[REAL-TIME] Kitchen button updated: ${previousKitchenStatus} → ${kitchenOpen}`);
                 break;
                 
             case 'ORDERS_CLEARED':
@@ -515,7 +519,7 @@ FOOD_OPTIONS['New Food Item'] = {
     }
     
     // Enhanced debug mode with performance tracking
-    const DEBUG_MODE = true;
+    const DEBUG_MODE = false;
     let performanceMetrics = {
         requests: 0,
         averageResponseTime: 0,
@@ -784,8 +788,11 @@ FOOD_OPTIONS['New Food Item'] = {
                         debugLog(`🔄 Kitchen status changed via polling: ${lastKitchenStatus} → ${kitchenResp.isOpen}`);
                         kitchenOpen = kitchenResp.isOpen;
                         
+                        // Always update button regardless of page
+                        updateKitchenButton();
+                        
                         if (currentPage === 'manager') {
-                            updateKitchenButton();
+                            // Button already updated above
                         } else if (currentPage === 'order') {
                             updateOrderPageDisplay();
                         }
@@ -1081,6 +1088,7 @@ FOOD_OPTIONS['New Food Item'] = {
             
             // Update button immediately for better UX
             updateKitchenButton();
+            debugLog(`[TOGGLE] Button updated immediately: ${previousStatus} → ${kitchenOpen}`);
             
             await setKitchenStatus(kitchenOpen);
             
@@ -1093,19 +1101,25 @@ FOOD_OPTIONS['New Food Item'] = {
             updateKitchenButton();
             updateOrderPageDisplay();
             showMessage('error', 'Failed to update kitchen status');
+            debugLog(`[TOGGLE] Reverted button due to error: ${kitchenOpen}`);
         }
     }
 
     function updateKitchenButton() {
         const button = document.getElementById('kitchenToggle');
         if (button) {
+            debugLog(`[UPDATE BUTTON] Updating kitchen button - kitchenOpen: ${kitchenOpen}`);
             if (kitchenOpen) {
                 button.textContent = 'Close Kitchen';
                 button.classList.remove('closed');
+                debugLog(`[UPDATE BUTTON] Button set to: Close Kitchen (open state)`);
             } else {
                 button.textContent = 'Open Kitchen';
                 button.classList.add('closed');
+                debugLog(`[UPDATE BUTTON] Button set to: Open Kitchen (closed state)`);
             }
+        } else {
+            debugLog(`[UPDATE BUTTON] Kitchen button not found!`);
         }
     }
 
