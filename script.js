@@ -3,6 +3,8 @@
 
 // ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
 
+DEBUG_MODE = false
+
 // Easy-to-edit food configuration
 const FOOD_OPTIONS = {
     // Breakfast items
