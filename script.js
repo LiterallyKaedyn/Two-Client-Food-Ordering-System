@@ -26,9 +26,23 @@ const FOOD_OPTIONS = {
         options: ['Vegan Nachos', 'Beef Nachos']
     },
     'Chicken Wraps': {
-        type: 'multiple',
-        label: 'Sauces (select all that apply)',
-        options: ['Sweet Chilli', 'Mayo', 'Tomato Sauce', 'Barbecue Sauce']
+        type: 'multiSection',
+        sections: [
+            {
+                label: 'Inside (select at least 2)',
+                id: 'inside',
+                required: true,
+                minRequired: 2,
+                options: ['Crumbed Chicken Tenders', 'Lettuce', 'Tomato', 'Coleslaw', 'Cheese', 'Mayo', 'Sweet Chilli Sauce']
+            },
+            {
+                label: 'Additional Options (optional)',
+                id: 'additional',
+                required: false,
+                minRequired: 0,
+                options: ['Toasted']
+            }
+        ]
     },
     'Ice Cream': {
         type: 'single',
@@ -49,11 +63,8 @@ const FOOD_OPTIONS = {
     
     // ========== AUTHENTICATION SYSTEM ==========
     
-    // Obfuscated authentication data
+    // Authentication configuration
     const AUTH_CONFIG = {
-        // Base64 encoded
-        key: 'S2FlZHluSXNDb29s',
-        salt: 'food_mgr_2025',
         sessionKey: 'manager_session_v2'
     };
     
@@ -61,19 +72,28 @@ const FOOD_OPTIONS = {
     const SESSION_DURATION = 60 * 60 * 1000; // 1 hour
     const ACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hour inactivity
     
-    // Decode authentication key
-    function getAuthKey() {
+    // Get authentication key from server
+    async function getAuthKey() {
         try {
-            return atob(AUTH_CONFIG.key);
-        } catch (e) {
+            debugLog('[AUTH] Fetching manager key from server');
+            const response = await fetch('/api/auth-key');
+            if (!response.ok) {
+                debugLog('[AUTH] Failed to fetch auth key:', response.status);
+                return null;
+            }
+            const data = await response.json();
+            debugLog('[AUTH] Auth key received from server');
+            return data.key;
+        } catch (error) {
+            debugLog('[AUTH] Error fetching auth key:', error.message);
             return null;
         }
     }
     
     // Validate password
-    function validateCredentials(input) {
+    async function validateCredentials(input) {
         if (!input || typeof input !== 'string') return false;
-        const expected = getAuthKey();
+        const expected = await getAuthKey();
         if (!expected) return false;
         return input === expected;
     }
@@ -144,7 +164,7 @@ const FOOD_OPTIONS = {
     }
     
     // Main authentication function
-    function authenticateManager() {
+    async function authenticateManager() {
         if (isSessionValid()) {
             updateSessionActivity();
             return true;
@@ -153,7 +173,8 @@ const FOOD_OPTIONS = {
         const credentials = prompt('Enter manager access code:');
         if (!credentials) return false;
         
-        if (validateCredentials(credentials)) {
+        const isValid = await validateCredentials(credentials);
+        if (isValid) {
             if (createSession()) {
                 return true;
             } else {
@@ -1210,7 +1231,8 @@ FOOD_OPTIONS['New Food Item'] = {
         
         // Manager portal authentication
         if (pageName === 'manager') {
-            if (!authenticateManager()) {
+            const authenticated = await authenticateManager();
+            if (!authenticated) {
                 debugLog('[MANAGER ACCESS] Authentication failed');
                 window.location.href = window.location.pathname;
                 return;
@@ -1607,7 +1629,8 @@ FOOD_OPTIONS['New Food Item'] = {
                     clickCount = 0; // Reset immediately
                     
                     // Go directly to manager authentication
-                    if (authenticateManager()) {
+                    const authenticated = await authenticateManager();
+                    if (authenticated) {
                         debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
                         window.location.href = '?page=manager';
                     } else {
@@ -1625,7 +1648,7 @@ FOOD_OPTIONS['New Food Item'] = {
         // Manager access link (now optional - triple click goes direct)
         const managerLink = document.getElementById('managerAccess');
         if (managerLink) {
-            managerLink.addEventListener('click', function(e) {
+            managerLink.addEventListener('click', async function(e) {
                 e.preventDefault();
                 debugLog('[MANAGER ACCESS] Manager link clicked - going to authentication');
                 
@@ -1633,7 +1656,8 @@ FOOD_OPTIONS['New Food Item'] = {
                 this.style.display = 'none';
                 
                 // Go directly to manager authentication
-                if (authenticateManager()) {
+                const authenticated = await authenticateManager();
+                if (authenticated) {
                     debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
                     window.location.href = '?page=manager';
                 } else {
