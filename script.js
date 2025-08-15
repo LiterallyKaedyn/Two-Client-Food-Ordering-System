@@ -1,6 +1,5 @@
 // script.js - Enhanced Food Ordering System with Real-time Updates via SSE
 // Food options configuration at the top for easy editing
-// ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
 
 // ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
 
@@ -259,6 +258,868 @@ const FOOD_OPTIONS = {
             return null;
         }
     }
+
+    function showNewOrderNotification(orderCount = 1) {
+        const notification = document.getElementById('newOrderNotification');
+        if (notification) {
+            // Enhanced notification text with sound status
+            const soundStatus = userHasInteracted ? '🔔' : '🔇';
+            notification.innerHTML = `${soundStatus} ${orderCount} new order${orderCount > 1 ? 's' : ''} received!`;
+            notification.style.display = 'block';
+            notification.style.animation = 'pulse 1s infinite';
+            notification.style.backgroundColor = '#28A745';
+            notification.style.border = '3px solid #000';
+            notification.style.fontWeight = '700';
+            
+            // Add click to test sound if user hasn't interacted yet
+            if (!userHasInteracted) {
+                notification.style.cursor = 'pointer';
+                notification.title = 'Click to enable sound notifications';
+                notification.onclick = function() {
+                    enableAudioAfterUserGesture();
+                    playNewOrderSound(); // Test the sound
+                    this.onclick = null; // Remove click handler
+                    this.style.cursor = 'default';
+                    this.title = '';
+                };
+            }
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+                notification.style.animation = '';
+                notification.onclick = null;
+                notification.style.cursor = 'default';
+            }, 8000); // Show for 8 seconds
+        }
+    }
+
+    async function showPage(pageName) {
+        // Close existing real-time connection when changing pages
+        closeRealTimeConnection();
+        
+        // Stop fallback polling
+        stopEventDrivenUpdates();
+        
+        // Manager portal authentication
+        if (pageName === 'manager') {
+            const authenticated = await authenticateManager();
+            if (!authenticated) {
+                debugLog('[MANAGER ACCESS] Authentication failed');
+                window.location.href = window.location.pathname;
+                return;
+            }
+            debugLog('[MANAGER ACCESS] Authentication successful');
+        }
+        
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.remove('active');
+        });
+
+        if (pageName === 'manager') {
+            document.getElementById('managerPage').classList.add('active');
+            document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Manage Active Orders';
+            loadOrders();
+            checkKitchenStatus();
+            loadRecentOrders();
+            setupRealTimeUpdates(); // Real-time updates for manager
+        } else if (pageName === 'tracking') {
+            document.getElementById('trackingPage').classList.add('active');
+            document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Track Your Order';
+            loadOrderTracking();
+            loadRecentOrders();
+            setupRealTimeUpdates(); // Real-time updates for tracking
+        } else {
+            document.getElementById('orderPage').classList.add('active');
+            document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering';
+            checkKitchenStatus();
+            loadRecentOrders();
+            setupRealTimeUpdates(); // Real-time updates for order page
+        }
+    }
+
+    function logoutManager() {
+        if (confirm('Are you sure you want to logout?')) {
+            clearSession();
+            showMessage('success', 'Logged out successfully. Redirecting...');
+            setTimeout(() => {
+                window.location.href = window.location.pathname;
+            }, 1500);
+        }
+    }
+
+    // Manager functions
+    async function loadOrders() {
+        const loading = document.getElementById('loading');
+        const container = document.getElementById('ordersContainer');
+        const noOrdersMsg = document.getElementById('noOrders');
+        
+        if (loading) loading.style.display = 'block';
+        if (container) container.innerHTML = '';
+        if (noOrdersMsg) noOrdersMsg.style.display = 'none';
+        
+        try {
+            const response = await getOrders();
+            const orders = response.orders || [];
+            
+            if (loading) loading.style.display = 'none';
+            lastOrderCount = orders.length;
+            
+            if (orders.length === 0) {
+                if (noOrdersMsg) noOrdersMsg.style.display = 'block';
+            } else if (container) {
+                container.innerHTML = orders.map((order) => `
+                    <div class="order-card" data-order-id="${order.id}">
+                        <h3>Order #${order.id}</h3>
+                        <div class="order-info">
+                            <strong>Food:</strong> ${order.food}<br>
+                            <strong>Room:</strong> ${order.room}<br>
+                            <strong>Name:</strong> ${order.name}<br>
+                            ${order.comments ? `<strong>Comments:</strong> ${order.comments}<br>` : ''}
+                            <strong>Time:</strong> ${order.timestamp}<br>
+                            <span class="status-badge status-${order.status}">${order.status.replace(/-/g, ' ')}</span>
+                        </div>
+                        <div class="status-controls">
+                            ${order.status === 'pending' ? `
+                                <button class="status-btn" data-order-id="${order.id}" data-status="accepted" type="button">Accept</button>
+                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
+                            ` : ''}
+                            ${order.status === 'accepted' ? `
+                                <button class="status-btn" data-order-id="${order.id}" data-status="being-made" type="button">Start Making</button>
+                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
+                            ` : ''}
+                            ${order.status === 'being-made' ? `
+                                <button class="status-btn" data-order-id="${order.id}" data-status="being-delivered" type="button">Out for Delivery</button>
+                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
+                            ` : ''}
+                            ${order.status === 'being-delivered' ? `
+                                <button class="status-btn" data-order-id="${order.id}" data-status="completed" type="button">Complete</button>
+                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Add event listeners
+                const statusButtons = container.querySelectorAll('.status-btn');
+                statusButtons.forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const orderId = this.getAttribute('data-order-id');
+                        const newStatus = this.getAttribute('data-status');
+                        
+                        debugLog(`[Button Click] Order: ${orderId}, New Status: ${newStatus}`);
+                        
+                        if (orderId && newStatus) {
+                            updateStatus(orderId, newStatus);
+                        }
+                    });
+                });
+
+                const deleteButtons = container.querySelectorAll('.delete-btn');
+                deleteButtons.forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const orderId = this.getAttribute('data-order-id');
+                        
+                        debugLog(`[Delete Button Click] Order: ${orderId}`);
+                        
+                        if (orderId) {
+                            deleteOrder(orderId);
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('Load orders error:', error.message);
+            if (loading) loading.style.display = 'none';
+            if (container) container.innerHTML = '<div class="error-message" style="display: block;">Failed to load orders. Please refresh.</div>';
+        }
+    }
+
+    async function updateStatus(orderId, newStatus) {
+        try {
+            debugLog(`[UPDATE STATUS] Starting update for Order ${orderId} to ${newStatus}`);
+            
+            const buttons = document.querySelectorAll('.status-btn');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.textContent = 'Updating...';
+            });
+            
+            const result = await updateOrderStatus(orderId, newStatus);
+            debugLog(`[UPDATE STATUS] Success:`, result);
+            
+            showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
+            
+            // Force immediate refresh after successful update
+            setTimeout(() => {
+                loadOrders();
+                loadRecentOrders();
+            }, 500);
+            
+            debugLog(`[UPDATE STATUS] Status update completed - forced UI refresh`);
+            
+        } catch (error) {
+            debugLog('[UPDATE STATUS] Error:', error);
+            showMessage('error', 'Failed to update order status: ' + error.message);
+            
+            const buttons = document.querySelectorAll('.status-btn');
+            buttons.forEach(btn => {
+                btn.disabled = false;
+                const status = btn.getAttribute('data-status');
+                switch(status) {
+                    case 'accepted': btn.textContent = 'Accept'; break;
+                    case 'being-made': btn.textContent = 'Start Making'; break;
+                    case 'being-delivered': btn.textContent = 'Out for Delivery'; break;
+                    case 'completed': btn.textContent = 'Complete'; break;
+                }
+            });
+        }
+    }
+
+    async function clearAllOrders() {
+        if (!confirm('Are you sure you want to clear ALL orders? This will move all active orders to completed status.')) {
+            return;
+        }
+        
+        try {
+            await clearOrders();
+            showMessage('success', 'All orders cleared');
+            
+            // Force immediate refresh after clearing
+            setTimeout(() => {
+                loadOrders();
+                loadRecentOrders();
+            }, 500);
+            
+            debugLog(`[CLEAR ORDERS] All orders cleared - forced UI refresh`);
+            
+        } catch (error) {
+            console.error('Clear orders error:', error.message);
+            showMessage('error', 'Failed to clear orders. Please try again.');
+        }
+    }
+
+    // Order tracking functions
+    async function loadOrderTracking() {
+        const orderId = getOrderIdFromUrl();
+        if (!orderId) return;
+
+        const trackingOrderId = document.getElementById('trackingOrderId');
+        const trackingOrderDetails = document.getElementById('trackingOrderDetails');
+
+        if (trackingOrderId) trackingOrderId.textContent = `#${orderId}`;
+
+        try {
+            const response = await getOrder(orderId);
+            const order = response.order;
+
+            if (!order) {
+                if (trackingOrderDetails) {
+                    trackingOrderDetails.innerHTML = `
+                        <div class="error-message" style="display: block;">
+                            Order not found. It may have been completed or cancelled.
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            if (trackingOrderDetails) {
+                trackingOrderDetails.innerHTML = `
+                    <h3>${order.food}</h3>
+                    <p><strong>Room:</strong> ${order.room}</p>
+                    <p><strong>Name:</strong> ${order.name}</p>
+                    ${order.comments ? `<p><strong>Comments:</strong> ${order.comments}</p>` : ''}
+                    <p><strong>Order Time:</strong> ${order.timestamp}</p>
+                    <p><strong>Current Status:</strong> <span class="status-badge status-${order.status}">${order.status.replace(/-/g, ' ')}</span></p>
+                    ${order.completedAt ? `<p><strong>Completed At:</strong> ${order.completedAt}</p>` : ''}
+                `;
+            }
+
+            updateStatusTimeline(order.status);
+
+        } catch (error) {
+            console.error('Load order tracking error:', error.message);
+            if (trackingOrderDetails) {
+                trackingOrderDetails.innerHTML = `
+                    <div class="error-message" style="display: block;">
+                        Failed to load order details. Please refresh the page.
+                    </div>
+                `;
+            }
+        }
+    }
+
+    function updateStatusTimeline(currentStatus) {
+        const steps = ['pending', 'accepted', 'being-made', 'being-delivered', 'completed'];
+        const currentIndex = steps.indexOf(currentStatus);
+
+        document.querySelectorAll('.timeline-step').forEach((step, index) => {
+            const circle = step.querySelector('.timeline-circle');
+            step.classList.remove('active', 'completed');
+            
+            if (index < currentIndex) {
+                step.classList.add('completed');
+            } else if (index === currentIndex) {
+                step.classList.add('active');
+            }
+        });
+    }
+
+    // Recent orders functions
+    async function loadRecentOrders() {
+        const recentContainer = document.getElementById('completedOrdersList');
+        if (!recentContainer) return;
+
+        try {
+            const response = await getRecentOrders();
+            const recentOrders = response.orders || [];
+
+            if (recentOrders.length === 0) {
+                recentContainer.innerHTML = '<p style="color: #666; text-align: center;">No orders yet.</p>';
+            } else {
+                recentContainer.innerHTML = recentOrders
+                    .map(order => `
+                        <div class="completed-order ${order.isActive ? 'active-order' : ''}">
+                            <h4>Order #${order.id}</h4>
+                            <p><strong>Food:</strong> ${order.food}</p>
+                            <p><strong>Customer:</strong> ${order.name}</p>
+                            <p><strong>Room:</strong> ${order.room}</p>
+                            <p><strong>Status:</strong> <span class="status-badge status-${order.status}" style="display: inline; padding: 2px 8px; font-size: 0.8em;">${order.status.replace(/-/g, ' ')}</span></p>
+                            <p><strong>Time:</strong> ${order.timestamp}</p>
+                            ${order.completedAt ? `<p><strong>Completed:</strong> ${order.completedAt}</p>` : ''}
+                        </div>
+                    `).join('');
+            }
+        } catch (error) {
+            console.error('Load recent orders error:', error.message);
+            recentContainer.innerHTML = '<p style="color: #dc3545;">Failed to load recent orders.</p>';
+        }
+    }
+
+    // Initialize enhanced food system
+    function initEnhancedFoodSystem() {
+        // Add event listener to food dropdown
+        const foodSelect = document.getElementById('food');
+        if (foodSelect) {
+            foodSelect.addEventListener('change', updateFoodOptions);
+            
+            // Debug: Log when food changes
+            foodSelect.addEventListener('change', function() {
+                const selectedFood = this.value;
+                console.log('Selected food:', selectedFood);
+                if (FOOD_OPTIONS[selectedFood]) {
+                    console.log('Food config:', FOOD_OPTIONS[selectedFood]);
+                }
+            });
+        }
+        
+        // Add management interface in debug mode
+        addFoodManagementInterface();
+        
+        debugLog('🍔 Enhanced food selection system initialized');
+    }
+
+    // Initialize
+    function init() {
+        const currentPage = getCurrentPage();
+        
+        // Reset tracking variables
+        lastOrderCount = 0;
+        lastDataHash = '';
+        lastTrackingOrderData = null;
+        lastKitchenStatus = null;
+        lastRecentOrdersHash = '';
+        
+        showPage(currentPage);
+        
+        debugLog(`[INIT] Application initialized on ${currentPage} page with real-time updates`);
+    }
+
+    // Enhanced Event Listeners
+    function setupEventListeners() {
+        // Enhanced order form handling with food options
+        const orderForm = document.getElementById('orderForm');
+        if (orderForm) {
+            orderForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                // Validate food options first
+                if (!validateFoodOptions()) {
+                    return;
+                }
+                
+                const submitBtn = document.getElementById('submitBtn');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Placing Order...';
+                
+                try {
+                    const formData = new FormData(this);
+                    const selectedSubOptions = getSelectedSubOptions();
+                    
+                    // Build the complete food description
+                    let foodDescription = formData.get('food');
+                    if (selectedSubOptions) {
+                        foodDescription += ` (${selectedSubOptions})`;
+                    }
+                    
+                    const order = {
+                        food: foodDescription,
+                        room: formData.get('room'),
+                        name: formData.get('name'),
+                        comments: formData.get('comments') || ''
+                    };
+                    
+                    const response = await addOrder(order);
+                    this.reset();
+                    
+                    // Clear dynamic options
+                    const existingOptions = document.querySelectorAll('[id^="foodOptions"]');
+                    existingOptions.forEach(el => el.remove());
+                    
+                    debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id}`);
+                    
+                    // Force refresh on manager page if it's open
+                    // This is a workaround since SSE might not be working
+                    if (response.order && response.order.id) {
+                        // Force recent orders to update
+                        setTimeout(() => {
+                            loadRecentOrders();
+                        }, 1000);
+                        
+                        // Redirect to tracking page
+                        setTimeout(() => {
+                            window.location.href = `?id=${response.order.id}`;
+                        }, 500);
+                    } else {
+                        showMessage('success', 'Order placed successfully!');
+                        // Force recent orders to update
+                        setTimeout(() => {
+                            loadRecentOrders();
+                        }, 1000);
+                    }
+                    
+                } catch (error) {
+                    console.error('Order submission error:', error.message);
+                    const errorMessage = error.message?.includes('HTTP 500') 
+                        ? 'Server error. Please check your API configuration and try again.' 
+                        : 'Failed to place order. Please try again.';
+                    showMessage('error', errorMessage);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Place Order';
+                }
+            });
+        }
+
+        // ENHANCED: Triple click detection for direct manager authentication
+        let clickCount = 0;
+        let clickTimer = null;
+        const header = document.querySelector('.header');
+        if (header) {
+            header.addEventListener('click', async function() {
+                clickCount++;
+                
+                // Clear existing timer
+                if (clickTimer) {
+                    clearTimeout(clickTimer);
+                }
+                
+                // Check for triple click - go directly to authentication
+                if (clickCount === 3) {
+                    debugLog('[MANAGER ACCESS] Triple click detected - attempting direct authentication');
+                    clickCount = 0; // Reset immediately
+                    
+                    // Go directly to manager authentication
+                    const authenticated = await authenticateManager();
+                    if (authenticated) {
+                        debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
+                        window.location.href = '?page=manager';
+                    } else {
+                        debugLog('[MANAGER ACCESS] Authentication failed');
+                    }
+                } else {
+                    // Set timer to reset click count after 800ms
+                    clickTimer = setTimeout(() => {
+                        clickCount = 0;
+                    }, 800);
+                }
+            });
+        }
+
+        // Manager access link (now optional - triple click goes direct)
+        const managerLink = document.getElementById('managerAccess');
+        if (managerLink) {
+            managerLink.addEventListener('click', async function(e) {
+                e.preventDefault();
+                debugLog('[MANAGER ACCESS] Manager link clicked - going to authentication');
+                
+                // Hide the link immediately
+                this.style.display = 'none';
+                
+                // Go directly to manager authentication
+                const authenticated = await authenticateManager();
+                if (authenticated) {
+                    debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
+                    window.location.href = '?page=manager';
+                } else {
+                    debugLog('[MANAGER ACCESS] Authentication failed');
+                }
+            });
+        }
+    }
+
+    // Test sound function for managers
+    function testNotificationSound() {
+        if (!userHasInteracted) {
+            enableAudioAfterUserGesture();
+        }
+        
+        playNewOrderSound();
+        
+        // Show feedback
+        showMessage('success', userHasInteracted ? 
+            'Sound test played! 🔔' : 
+            'Sound enabled! Click anywhere to activate audio, then test again.', 3000);
+    }
+
+    // Global function assignments for onclick handlers
+    window.toggleKitchenStatus = toggleKitchenStatus;
+    window.loadOrders = loadOrders;
+    window.clearAllOrders = clearAllOrders;
+    window.logoutManager = logoutManager;
+    window.goToOrderPage = goToOrderPage;
+    window.testNotificationSound = testNotificationSound;
+    window.adjustCounter = adjustCounter;
+    window.toggleBoolean = toggleBoolean;
+    window.toggleConditional = toggleConditional;
+
+    // Enhanced cleanup and navigation handling
+    window.addEventListener('beforeunload', function() {
+        closeRealTimeConnection();
+        stopEventDrivenUpdates();
+        debugLog('[CLEANUP] Stopping updates and closing connections before page unload');
+    });
+    
+    window.addEventListener('popstate', function() {
+        debugLog('[NAVIGATION] Popstate detected - reinitializing');
+        init();
+    });
+    
+    // Handle visibility changes to pause/resume updates when tab is hidden/shown
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            debugLog('[VISIBILITY] Tab hidden - real-time connection will pause');
+        } else {
+            debugLog('[VISIBILITY] Tab visible - real-time connection will resume');
+            // Force a quick update when tab becomes visible again
+            setTimeout(() => {
+                const currentPage = getCurrentPage();
+                if (currentPage === 'manager') {
+                    loadOrders();
+                } else if (currentPage === 'tracking') {
+                    loadOrderTracking();
+                }
+                loadRecentOrders();
+            }, 500);
+        }
+    });
+    
+    // Show performance info on page load
+    setTimeout(() => {
+        if (DEBUG_MODE) {
+            console.log('📊 Real-time Updates Summary:');
+            console.log('🔄 Real-time events via Server-Sent Events (SSE) with polling fallback');
+            console.log('📡 Enhanced polling intervals:', UPDATE_INTERVALS);
+            console.log('🔔 Bell sound notifications enabled (/assets/bell.mp3)');
+            console.log('🎵 Audio requires user interaction (Chrome autoplay policy)');
+            console.log('🍔 Enhanced food selection system enabled');
+            console.log('🖱️ Triple-click header for direct manager authentication');
+            console.log('🎯 Click anywhere to enable audio notifications');
+            console.log('⚡ Real-time updates for: Kitchen status, New orders, Order status changes');
+            console.log('🔗 Connection indicator in top-right corner');
+        }
+    }, 1000);
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setupActivityTracking();
+            setupEventListeners();
+            initEnhancedFoodSystem();
+            init();
+            debugLog('[STARTUP] Application fully loaded with real-time updates and enhanced food selection');
+        });
+    } else {
+        setupActivityTracking();
+        setupEventListeners();
+        initEnhancedFoodSystem();
+        init();
+        debugLog('[STARTUP] Application fully loaded with real-time updates and enhanced food selection');
+    }
+
+    // ========== ADDITIONAL UTILITY FUNCTIONS ==========
+    
+    // Format timestamps for display
+    function formatTimestamp(timestamp) {
+        try {
+            const date = new Date(timestamp);
+            return date.toLocaleString('en-NZ', {
+                timeZone: 'Pacific/Auckland',
+                hour: '2-digit',
+                minute: '2-digit',
+                day: '2-digit',
+                month: '2-digit'
+            });
+        } catch (e) {
+            return timestamp;
+        }
+    }
+    
+    // Validate order data before submission
+    function validateOrderData(order) {
+        if (!order.food || order.food.trim() === '') {
+            throw new Error('Please select a food item');
+        }
+        if (!order.room || order.room.trim() === '') {
+            throw new Error('Please enter your room number');
+        }
+        if (!order.name || order.name.trim() === '') {
+            throw new Error('Please enter your name');
+        }
+        return true;
+    }
+    
+    // Enhanced error reporting for debugging
+    function reportError(error, context = '') {
+        const errorReport = {
+            message: error.message,
+            stack: error.stack,
+            context: context,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            url: window.location.href,
+            page: getCurrentPage()
+        };
+        
+        debugLog('🚨 ERROR REPORT:', errorReport);
+        
+        // In production, you could send this to an error tracking service
+        if (DEBUG_MODE) {
+            console.error('Full error details:', errorReport);
+        }
+    }
+    
+    // Network status detection
+    function setupNetworkStatusTracking() {
+        function updateOnlineStatus() {
+            const isOnline = navigator.onLine;
+            const indicator = document.getElementById('connectionStatus');
+            
+            if (!isOnline && indicator) {
+                indicator.textContent = '📴 Offline';
+                indicator.style.backgroundColor = '#6c757d';
+                indicator.style.color = 'white';
+                debugLog('🌐 Network: OFFLINE');
+            } else if (isOnline && indicator && indicator.textContent === '📴 Offline') {
+                // Reconnect when back online
+                debugLog('🌐 Network: ONLINE - attempting to reconnect');
+                setTimeout(() => {
+                    setupRealTimeUpdates();
+                }, 1000);
+            }
+        }
+        
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+        updateOnlineStatus(); // Check initial status
+    }
+    
+    // Enhanced keyboard shortcuts for managers
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', function(e) {
+            // Only enable shortcuts on manager page
+            if (getCurrentPage() !== 'manager') return;
+            
+            // Ctrl/Cmd + R: Refresh orders
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                e.preventDefault();
+                loadOrders();
+                showMessage('success', 'Orders refreshed', 2000);
+            }
+            
+            // Ctrl/Cmd + K: Toggle kitchen status
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                toggleKitchenStatus();
+            }
+            
+            // Ctrl/Cmd + T: Test sound
+            if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+                e.preventDefault();
+                testNotificationSound();
+            }
+            
+            // Escape: Clear all selections
+            if (e.key === 'Escape') {
+                const activeElements = document.querySelectorAll('.status-btn:focus, .delete-btn:focus');
+                activeElements.forEach(el => el.blur());
+            }
+        });
+        
+        debugLog('⌨️ Keyboard shortcuts enabled for manager page');
+    }
+    
+    // Auto-save form data to prevent loss
+    function setupAutoSave() {
+        const orderForm = document.getElementById('orderForm');
+        if (!orderForm) return;
+        
+        const AUTOSAVE_KEY = 'food_order_draft';
+        
+        // Load saved data on page load
+        function loadDraft() {
+            try {
+                const saved = localStorage.getItem(AUTOSAVE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const now = Date.now();
+                    
+                    // Only restore if saved within last hour
+                    if (now - data.timestamp < 60 * 60 * 1000) {
+                        if (data.food) {
+                            const foodSelect = document.getElementById('food');
+                            if (foodSelect) foodSelect.value = data.food;
+                        }
+                        if (data.room) {
+                            const roomInput = document.getElementById('room');
+                            if (roomInput) roomInput.value = data.room;
+                        }
+                        if (data.name) {
+                            const nameInput = document.getElementById('name');
+                            if (nameInput) nameInput.value = data.name;
+                        }
+                        if (data.comments) {
+                            const commentsInput = document.getElementById('comments');
+                            if (commentsInput) commentsInput.value = data.comments;
+                        }
+                        
+                        debugLog('📝 Draft order restored from autosave');
+                    }
+                }
+            } catch (e) {
+                debugLog('❌ Failed to load draft:', e.message);
+            }
+        }
+        
+        // Save form data as user types
+        function saveDraft() {
+            try {
+                const formData = new FormData(orderForm);
+                const data = {
+                    food: formData.get('food'),
+                    room: formData.get('room'),
+                    name: formData.get('name'),
+                    comments: formData.get('comments'),
+                    timestamp: Date.now()
+                };
+                
+                localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+            } catch (e) {
+                debugLog('❌ Failed to save draft:', e.message);
+            }
+        }
+        
+        // Clear draft when order is successfully submitted
+        function clearDraft() {
+            try {
+                localStorage.removeItem(AUTOSAVE_KEY);
+                debugLog('🗑️ Draft order cleared after successful submission');
+            } catch (e) {
+                debugLog('❌ Failed to clear draft:', e.message);
+            }
+        }
+        
+        // Set up event listeners
+        const inputs = orderForm.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.addEventListener('input', saveDraft);
+            input.addEventListener('change', saveDraft);
+        });
+        
+        // Clear draft on successful form submission
+        orderForm.addEventListener('submit', function() {
+            setTimeout(clearDraft, 1000); // Clear after successful submission
+        });
+        
+        // Load draft on page load
+        setTimeout(loadDraft, 500);
+        
+        debugLog('💾 Auto-save enabled for order form');
+    }
+    
+    // Analytics and usage tracking (privacy-friendly)
+    function setupAnalytics() {
+        const analytics = {
+            pageViews: 0,
+            orderAttempts: 0,
+            successfulOrders: 0,
+            managerLogins: 0,
+            startTime: Date.now()
+        };
+        
+        // Track page views
+        analytics.pageViews++;
+        
+        // Track order attempts
+        const orderForm = document.getElementById('orderForm');
+        if (orderForm) {
+            orderForm.addEventListener('submit', function() {
+                analytics.orderAttempts++;
+                debugLog(`📊 Analytics: ${analytics.orderAttempts} order attempts`);
+            });
+        }
+        
+        // Track successful orders (when redirected to tracking page)
+        if (getCurrentPage() === 'tracking') {
+            analytics.successfulOrders++;
+            debugLog(`📊 Analytics: ${analytics.successfulOrders} successful orders`);
+        }
+        
+        // Track manager logins
+        if (getCurrentPage() === 'manager') {
+            analytics.managerLogins++;
+            debugLog(`📊 Analytics: ${analytics.managerLogins} manager logins`);
+        }
+        
+        // Report analytics periodically (for debugging)
+        if (DEBUG_MODE) {
+            setInterval(() => {
+                const sessionTime = Math.round((Date.now() - analytics.startTime) / 1000);
+                console.log('📊 Session Analytics:', {
+                    ...analytics,
+                    sessionTimeSeconds: sessionTime
+                });
+            }, 30000); // Every 30 seconds
+        }
+        
+        window.foodOrderAnalytics = analytics;
+    }
+    
+    // Initialize additional features
+    setupNetworkStatusTracking();
+    setupKeyboardShortcuts();
+    setupAutoSave();
+    setupAnalytics();
+    
+    debugLog('🎉 All systems initialized and ready!');
+
+})();
     
     // Validate password
     function validateCredentials(input) {
@@ -381,401 +1242,346 @@ const FOOD_OPTIONS = {
     
     // ========== ENHANCED FOOD SELECTION SYSTEM ==========
     
-// Enhanced function to generate dynamic options HTML (replaces existing generateOptionsHTML function)
-function generateOptionsHTML(foodItem) {
-    const config = FOOD_OPTIONS[foodItem];
-    if (!config) return '';
+    // Enhanced function to generate dynamic options HTML
+    function generateOptionsHTML(foodItem) {
+        const config = FOOD_OPTIONS[foodItem];
+        if (!config) return '';
 
-    let html = '';
+        let html = '';
 
-    if (config.type === 'single') {
-        html = `
-            <div class="form-group" id="foodOptions">
-                <label for="foodSubOptions">${config.label}:</label>
-                <select id="foodSubOptions" name="foodSubOptions" required>
-                    <option value="">Select an option...</option>
-        `;
-        config.options.forEach(option => {
-            html += `<option value="${option}">${option}</option>`;
-        });
-        html += '</select></div>';
-    } else if (config.type === 'multiple') {
-        html = `
-            <div class="form-group" id="foodOptions">
-                <label for="foodSubOptions">${config.label}:</label>
-                <div class="checkbox-group">
-        `;
-        config.options.forEach((option, index) => {
-            html += `
-                <div class="checkbox-item">
-                    <input type="checkbox" id="option${index}" name="foodSubOptions" value="${option}">
-                    <label for="option${index}">${option}</label>
-                </div>
+        if (config.type === 'single') {
+            html = `
+                <div class="form-group" id="foodOptions">
+                    <label for="foodSubOptions">${config.label}:</label>
+                    <select id="foodSubOptions" name="foodSubOptions" required>
+                        <option value="">Select an option...</option>
             `;
-        });
-        html += '</div></div>';
-    } else if (config.type === 'multiSection') {
-        // Handle multi-section configurations (like Chicken Wraps)
-        config.sections.forEach((section, sectionIndex) => {
-            html += `
-                <div class="form-group" id="foodOptions${sectionIndex}">
-                    <label>${section.label}:</label>
+            config.options.forEach(option => {
+                html += `<option value="${option}">${option}</option>`;
+            });
+            html += '</select></div>';
+        } else if (config.type === 'multiple') {
+            html = `
+                <div class="form-group" id="foodOptions">
+                    <label for="foodSubOptions">${config.label}:</label>
+                    <div class="checkbox-group">
             `;
-            
-            if (section.minRequired > 0) {
-                html += `<small style="color: #FF6B35; font-weight: 600; display: block; margin-bottom: 10px;">*Minimum ${section.minRequired} selections required</small>`;
-            }
-            
-            html += '<div class="checkbox-group">';
-            section.options.forEach((option, optionIndex) => {
+            config.options.forEach((option, index) => {
                 html += `
                     <div class="checkbox-item">
-                        <input type="checkbox" 
-                               id="${section.id}_option${optionIndex}" 
-                               name="foodSubOptions_${section.id}" 
-                               value="${option}"
-                               data-section="${section.id}"
-                               data-min-required="${section.minRequired || 0}">
-                        <label for="${section.id}_option${optionIndex}">${option}</label>
+                        <input type="checkbox" id="option${index}" name="foodSubOptions" value="${option}">
+                        <label for="option${index}">${option}</label>
                     </div>
                 `;
             });
             html += '</div></div>';
-        });
-    } else if (config.type === 'beverageCustom') {
-        // Handle beverage customization with counters and boolean options
-        config.sections.forEach((section, sectionIndex) => {
-            html += `<div class="form-group beverage-option" id="foodOptions${sectionIndex}">`;
-            
-            if (section.type === 'counter') {
-                const defaultValue = section.default || section.min || 0;
+        } else if (config.type === 'multiSection') {
+            // Handle multi-section configurations (like Chicken Wraps)
+            config.sections.forEach((section, sectionIndex) => {
                 html += `
-                    <div class="counter-control">
+                    <div class="form-group" id="foodOptions${sectionIndex}">
                         <label>${section.label}:</label>
-                        <div class="counter-buttons">
-                            <button type="button" class="counter-btn" 
-                                    onclick="adjustCounter('${section.id}', -1, ${section.min}, ${section.max})"
-                                    data-action="decrease">−</button>
-                            <div class="counter-display" id="counter_${section.id}">${defaultValue}</div>
-                            <button type="button" class="counter-btn" 
-                                    onclick="adjustCounter('${section.id}', 1, ${section.min}, ${section.max})"
-                                    data-action="increase">+</button>
-                        </div>
-                        <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
-                    </div>
                 `;
-            } else if (section.type === 'boolean') {
-                const defaultValue = section.default || section.options[0];
-                html += `
-                    <div class="boolean-control">
-                        <label>${section.label}:</label>
-                        <div class="boolean-buttons">
-                `;
+                
+                if (section.minRequired > 0) {
+                    html += `<small style="color: #FF6B35; font-weight: 600; display: block; margin-bottom: 10px;">*Minimum ${section.minRequired} selections required</small>`;
+                }
+                
+                html += '<div class="checkbox-group">';
                 section.options.forEach((option, optionIndex) => {
-                    const isActive = option === defaultValue;
                     html += `
-                        <button type="button" class="boolean-btn ${isActive ? 'active' : ''}" 
-                                onclick="toggleBoolean('${section.id}', '${option}')"
-                                data-option="${option}">${option}</button>
+                        <div class="checkbox-item">
+                            <input type="checkbox" 
+                                   id="${section.id}_option${optionIndex}" 
+                                   name="foodSubOptions_${section.id}" 
+                                   value="${option}"
+                                   data-section="${section.id}"
+                                   data-min-required="${section.minRequired || 0}">
+                            <label for="${section.id}_option${optionIndex}">${option}</label>
+                        </div>
                     `;
                 });
-                html += `
-                        </div>
-                        <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
-                    </div>
-                `;
-            } else if (section.type === 'conditional') {
-                const defaultValue = section.default || section.options[0];
-                const isVisible = false; // Initially hidden
-                html += `
-                    <div class="conditional-control ${isVisible ? 'visible' : ''}" id="conditional_${section.id}">
-                        <label>${section.label}:</label>
-                        <div class="conditional-buttons">
-                `;
-                section.options.forEach((option, optionIndex) => {
-                    const isActive = option === defaultValue;
+                html += '</div></div>';
+            });
+        } else if (config.type === 'beverageCustom') {
+            // Handle beverage customization with counters and boolean options
+            config.sections.forEach((section, sectionIndex) => {
+                html += `<div class="form-group beverage-option" id="foodOptions${sectionIndex}">`;
+                
+                if (section.type === 'counter') {
+                    const defaultValue = section.default || section.min || 0;
                     html += `
-                        <button type="button" class="conditional-btn ${isActive ? 'active' : ''}" 
-                                onclick="toggleConditional('${section.id}', '${option}')"
-                                data-option="${option}">${option}</button>
-                    `;
-                });
-                html += `
+                        <div class="counter-control">
+                            <label>${section.label}:</label>
+                            <div class="counter-buttons">
+                                <button type="button" class="counter-btn" 
+                                        onclick="adjustCounter('${section.id}', -1, ${section.min}, ${section.max})"
+                                        data-action="decrease">−</button>
+                                <div class="counter-display" id="counter_${section.id}">${defaultValue}</div>
+                                <button type="button" class="counter-btn" 
+                                        onclick="adjustCounter('${section.id}', 1, ${section.min}, ${section.max})"
+                                        data-action="increase">+</button>
+                            </div>
+                            <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
                         </div>
-                        <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
-                    </div>
-                `;
+                    `;
+                } else if (section.type === 'boolean') {
+                    const defaultValue = section.default || section.options[0];
+                    html += `
+                        <div class="boolean-control">
+                            <label>${section.label}:</label>
+                            <div class="boolean-buttons">
+                    `;
+                    section.options.forEach((option, optionIndex) => {
+                        const isActive = option === defaultValue;
+                        html += `
+                            <button type="button" class="boolean-btn ${isActive ? 'active' : ''}" 
+                                    onclick="toggleBoolean('${section.id}', '${option}')"
+                                    data-option="${option}">${option}</button>
+                        `;
+                    });
+                    html += `
+                            </div>
+                            <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
+                        </div>
+                    `;
+                } else if (section.type === 'conditional') {
+                    const defaultValue = section.default || section.options[0];
+                    const isVisible = false; // Initially hidden
+                    html += `
+                        <div class="conditional-control ${isVisible ? 'visible' : ''}" id="conditional_${section.id}">
+                            <label>${section.label}:</label>
+                            <div class="conditional-buttons">
+                    `;
+                    section.options.forEach((option, optionIndex) => {
+                        const isActive = option === defaultValue;
+                        html += `
+                            <button type="button" class="conditional-btn ${isActive ? 'active' : ''}" 
+                                    onclick="toggleConditional('${section.id}', '${option}')"
+                                    data-option="${option}">${option}</button>
+                        `;
+                    });
+                    html += `
+                            </div>
+                            <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+            });
+        }
+
+        return html;
+    }
+
+    // Counter control function for beverages
+    function adjustCounter(sectionId, change, min, max) {
+        const display = document.getElementById(`counter_${sectionId}`);
+        const hidden = document.getElementById(`hidden_${sectionId}`);
+        
+        if (!display || !hidden) return;
+        
+        let currentValue = parseInt(hidden.value) || 0;
+        let newValue = currentValue + change;
+        
+        // Enforce min/max bounds
+        if (newValue < min) newValue = min;
+        if (newValue > max) newValue = max;
+        
+        // Update display and hidden input
+        display.textContent = newValue;
+        hidden.value = newValue;
+        
+        // Update button states
+        const decreaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', -1"]`);
+        const increaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', 1"]`);
+        
+        if (decreaseBtn) decreaseBtn.disabled = (newValue <= min);
+        if (increaseBtn) increaseBtn.disabled = (newValue >= max);
+        
+        console.log(`Counter ${sectionId}: ${currentValue} → ${newValue} (range: ${min}-${max})`);
+    }
+
+    // Boolean toggle function for beverages
+    function toggleBoolean(sectionId, selectedOption) {
+        const hidden = document.getElementById(`hidden_${sectionId}`);
+        const buttons = document.querySelectorAll(`[onclick*="toggleBoolean('${sectionId}'"]`);
+        
+        if (!hidden) return;
+        
+        // Update hidden input
+        hidden.value = selectedOption;
+        
+        // Update button states
+        buttons.forEach(btn => {
+            const option = btn.getAttribute('data-option');
+            if (option === selectedOption) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
             }
-            
-            html += '</div>';
+        });
+        
+        // Handle conditional fields that depend on this boolean
+        handleConditionalVisibility(sectionId, selectedOption);
+        
+        console.log(`Boolean ${sectionId}: ${selectedOption}`);
+    }
+
+    // Conditional toggle function for beverages
+    function toggleConditional(sectionId, selectedOption) {
+        const hidden = document.getElementById(`hidden_${sectionId}`);
+        const buttons = document.querySelectorAll(`[onclick*="toggleConditional('${sectionId}'"]`);
+        
+        if (!hidden) return;
+        
+        // Update hidden input
+        hidden.value = selectedOption;
+        
+        // Update button states
+        buttons.forEach(btn => {
+            const option = btn.getAttribute('data-option');
+            if (option === selectedOption) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        
+        console.log(`Conditional ${sectionId}: ${selectedOption}`);
+    }
+
+    // Handle conditional field visibility
+    function handleConditionalVisibility(dependencyId, selectedValue) {
+        const foodSelect = document.getElementById('food');
+        const selectedFood = foodSelect.value;
+        
+        if (!selectedFood || !FOOD_OPTIONS[selectedFood]) return;
+        
+        const config = FOOD_OPTIONS[selectedFood];
+        if (config.type !== 'beverageCustom') return;
+        
+        // Find conditional sections that depend on this field
+        config.sections.forEach(section => {
+            if (section.type === 'conditional' && section.dependsOn === dependencyId) {
+                const conditionalElement = document.getElementById(`conditional_${section.id}`);
+                const hiddenInput = document.getElementById(`hidden_${section.id}`);
+                
+                if (conditionalElement && hiddenInput) {
+                    if (selectedValue === section.showWhen) {
+                        // Show the conditional field
+                        conditionalElement.classList.add('visible');
+                        
+                        // Ensure the hidden input has a value
+                        if (!hiddenInput.value) {
+                            hiddenInput.value = section.default || section.options[0];
+                            
+                            // Update button states
+                            const buttons = conditionalElement.querySelectorAll('.conditional-btn');
+                            buttons.forEach(btn => {
+                                const option = btn.getAttribute('data-option');
+                                if (option === hiddenInput.value) {
+                                    btn.classList.add('active');
+                                } else {
+                                    btn.classList.remove('active');
+                                }
+                            });
+                        }
+                    } else {
+                        // Hide the conditional field
+                        conditionalElement.classList.remove('visible');
+                        
+                        // Clear the value since it's not relevant
+                        hiddenInput.value = '';
+                        
+                        // Reset button states
+                        const buttons = conditionalElement.querySelectorAll('.conditional-btn');
+                        buttons.forEach(btn => btn.classList.remove('active'));
+                    }
+                }
+            }
         });
     }
 
-    return html;
-}
-
-// Counter control function for beverages
-function adjustCounter(sectionId, change, min, max) {
-    const display = document.getElementById(`counter_${sectionId}`);
-    const hidden = document.getElementById(`hidden_${sectionId}`);
-    
-    if (!display || !hidden) return;
-    
-    let currentValue = parseInt(hidden.value) || 0;
-    let newValue = currentValue + change;
-    
-    // Enforce min/max bounds
-    if (newValue < min) newValue = min;
-    if (newValue > max) newValue = max;
-    
-    // Update display and hidden input
-    display.textContent = newValue;
-    hidden.value = newValue;
-    
-    // Update button states
-    const decreaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', -1"]`);
-    const increaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', 1"]`);
-    
-    if (decreaseBtn) decreaseBtn.disabled = (newValue <= min);
-    if (increaseBtn) increaseBtn.disabled = (newValue >= max);
-    
-    console.log(`Counter ${sectionId}: ${currentValue} → ${newValue} (range: ${min}-${max})`);
-}
-
-// Boolean toggle function for beverages
-function toggleBoolean(sectionId, selectedOption) {
-    const hidden = document.getElementById(`hidden_${sectionId}`);
-    const buttons = document.querySelectorAll(`[onclick*="toggleBoolean('${sectionId}'"]`);
-    
-    if (!hidden) return;
-    
-    // Update hidden input
-    hidden.value = selectedOption;
-    
-    // Update button states
-    buttons.forEach(btn => {
-        const option = btn.getAttribute('data-option');
-        if (option === selectedOption) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
+    // SINGLE COMPLETE getSelectedSubOptions function - handles ALL food types including beverages
+    function getSelectedSubOptions() {
+        const foodSelect = document.getElementById('food');
+        const selectedFood = foodSelect.value;
+        
+        if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
+            return '';
         }
-    });
-    
-    // Handle conditional fields that depend on this boolean
-    handleConditionalVisibility(sectionId, selectedOption);
-    
-    console.log(`Boolean ${sectionId}: ${selectedOption}`);
-}
-
-// Conditional toggle function for beverages
-function toggleConditional(sectionId, selectedOption) {
-    const hidden = document.getElementById(`hidden_${sectionId}`);
-    const buttons = document.querySelectorAll(`[onclick*="toggleConditional('${sectionId}'"]`);
-    
-    if (!hidden) return;
-    
-    // Update hidden input
-    hidden.value = selectedOption;
-    
-    // Update button states
-    buttons.forEach(btn => {
-        const option = btn.getAttribute('data-option');
-        if (option === selectedOption) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    
-    console.log(`Conditional ${sectionId}: ${selectedOption}`);
-}
-
-// Handle conditional field visibility
-function handleConditionalVisibility(dependencyId, selectedValue) {
-    const foodSelect = document.getElementById('food');
-    const selectedFood = foodSelect.value;
-    
-    if (!selectedFood || !FOOD_OPTIONS[selectedFood]) return;
-    
-    const config = FOOD_OPTIONS[selectedFood];
-    if (config.type !== 'beverageCustom') return;
-    
-    // Find conditional sections that depend on this field
-    config.sections.forEach(section => {
-        if (section.type === 'conditional' && section.dependsOn === dependencyId) {
-            const conditionalElement = document.getElementById(`conditional_${section.id}`);
-            const hiddenInput = document.getElementById(`hidden_${section.id}`);
+        
+        const config = FOOD_OPTIONS[selectedFood];
+        
+        if (config.type === 'single') {
+            const selectElement = document.getElementById('foodSubOptions');
+            return selectElement ? selectElement.value : '';
+        } else if (config.type === 'multiple') {
+            const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+            return selected.length > 0 ? selected.join(', ') : '';
+        } else if (config.type === 'multiSection') {
+            let allSelections = [];
             
-            if (conditionalElement && hiddenInput) {
-                if (selectedValue === section.showWhen) {
-                    // Show the conditional field
-                    conditionalElement.classList.add('visible');
-                    
-                    // Ensure the hidden input has a value
-                    if (!hiddenInput.value) {
-                        hiddenInput.value = section.default || section.options[0];
-                        
-                        // Update button states
-                        const buttons = conditionalElement.querySelectorAll('.conditional-btn');
-                        buttons.forEach(btn => {
-                            const option = btn.getAttribute('data-option');
-                            if (option === hiddenInput.value) {
-                                btn.classList.add('active');
-                            } else {
-                                btn.classList.remove('active');
-                            }
-                        });
-                    }
-                } else {
-                    // Hide the conditional field
-                    conditionalElement.classList.remove('visible');
-                    
-                    // Clear the value since it's not relevant
-                    hiddenInput.value = '';
-                    
-                    // Reset button states
-                    const buttons = conditionalElement.querySelectorAll('.conditional-btn');
-                    buttons.forEach(btn => btn.classList.remove('active'));
+            config.sections.forEach(section => {
+                const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
+                const selected = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (selected.length > 0) {
+                    allSelections.push(`${section.id}: ${selected.join(', ')}`);
                 }
-            }
+            });
+            
+            return allSelections.length > 0 ? allSelections.join(' | ') : '';
+        } else if (config.type === 'beverageCustom') {
+            let beverageOptions = [];
+            
+            config.sections.forEach(section => {
+                const hiddenInput = document.getElementById(`hidden_${section.id}`);
+                if (hiddenInput) {
+                    if (section.type === 'counter') {
+                        const value = parseInt(hiddenInput.value) || 0;
+                        if (value > 0) {
+                            beverageOptions.push(`${value} sugar`);
+                        } else {
+                            beverageOptions.push('no sugar');
+                        }
+                    } else if (section.type === 'boolean') {
+                        const value = hiddenInput.value.toLowerCase();
+                        if (section.id === 'milk') {
+                            if (value === 'yes') {
+                                beverageOptions.push('with milk');
+                            } else {
+                                beverageOptions.push('no milk');
+                            }
+                        } else if (section.id === 'hasCup') {
+                            if (value === 'yes') {
+                                beverageOptions.push('has cup');
+                            } else {
+                                beverageOptions.push('needs cup');
+                            }
+                        }
+                    } else if (section.type === 'conditional') {
+                        // Only include conditional values if they're actually visible and set
+                        const parentSection = config.sections.find(s => s.id === section.dependsOn);
+                        const parentInput = document.getElementById(`hidden_${section.dependsOn}`);
+                        
+                        if (parentInput && parentInput.value === section.showWhen && hiddenInput.value) {
+                            if (section.id === 'cupLocation') {
+                                beverageOptions.push(`cup: ${hiddenInput.value.toLowerCase()}`);
+                            }
+                        }
+                    }
+                }
+            });
+            
+            return beverageOptions.length > 0 ? beverageOptions.join(', ') : '';
         }
-    });
-}
-
-// Counter control function for beverages
-function adjustCounter(sectionId, change, min, max) {
-    const display = document.getElementById(`counter_${sectionId}`);
-    const hidden = document.getElementById(`hidden_${sectionId}`);
-    
-    if (!display || !hidden) return;
-    
-    let currentValue = parseInt(hidden.value) || 0;
-    let newValue = currentValue + change;
-    
-    // Enforce min/max bounds
-    if (newValue < min) newValue = min;
-    if (newValue > max) newValue = max;
-    
-    // Update display and hidden input
-    display.textContent = newValue;
-    hidden.value = newValue;
-    
-    // Update button states
-    const decreaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', -1"]`);
-    const increaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', 1"]`);
-    
-    if (decreaseBtn) decreaseBtn.disabled = (newValue <= min);
-    if (increaseBtn) increaseBtn.disabled = (newValue >= max);
-    
-    console.log(`Counter ${sectionId}: ${currentValue} → ${newValue} (range: ${min}-${max})`);
-}
-
-// Boolean toggle function for beverages
-function toggleBoolean(sectionId, selectedOption) {
-    const hidden = document.getElementById(`hidden_${sectionId}`);
-    const buttons = document.querySelectorAll(`[onclick*="toggleBoolean('${sectionId}'"]`);
-    
-    if (!hidden) return;
-    
-    // Update hidden input
-    hidden.value = selectedOption;
-    
-    // Update button states
-    buttons.forEach(btn => {
-        const option = btn.getAttribute('data-option');
-        if (option === selectedOption) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    
-    console.log(`Boolean ${sectionId}: ${selectedOption}`);
-}
-
-// REMOVE THE DUPLICATE getSelectedSubOptions FUNCTION and replace with this COMPLETE version:
-
-// Enhanced function to get selected sub-options including beverage customizations
-function getSelectedSubOptions() {
-    const foodSelect = document.getElementById('food');
-    const selectedFood = foodSelect.value;
-    
-    if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
+        
         return '';
     }
-    
-    const config = FOOD_OPTIONS[selectedFood];
-    
-    if (config.type === 'single') {
-        const selectElement = document.getElementById('foodSubOptions');
-        return selectElement ? selectElement.value : '';
-    } else if (config.type === 'multiple') {
-        const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
-        const selected = Array.from(checkboxes).map(cb => cb.value);
-        return selected.length > 0 ? selected.join(', ') : '';
-    } else if (config.type === 'multiSection') {
-        let allSelections = [];
-        
-        config.sections.forEach(section => {
-            const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
-            const selected = Array.from(checkboxes).map(cb => cb.value);
-            
-            if (selected.length > 0) {
-                allSelections.push(`${section.id}: ${selected.join(', ')}`);
-            }
-        });
-        
-        return allSelections.length > 0 ? allSelections.join(' | ') : '';
-    } else if (config.type === 'beverageCustom') {
-        let beverageOptions = [];
-        
-        config.sections.forEach(section => {
-            const hiddenInput = document.getElementById(`hidden_${section.id}`);
-            if (hiddenInput) {
-                if (section.type === 'counter') {
-                    const value = parseInt(hiddenInput.value) || 0;
-                    if (value > 0) {
-                        beverageOptions.push(`${value} sugar`);
-                    } else {
-                        beverageOptions.push('no sugar');
-                    }
-                } else if (section.type === 'boolean') {
-                    const value = hiddenInput.value.toLowerCase();
-                    if (section.id === 'milk') {
-                        if (value === 'yes') {
-                            beverageOptions.push('with milk');
-                        } else {
-                            beverageOptions.push('no milk');
-                        }
-                    } else if (section.id === 'hasCup') {
-                        if (value === 'yes') {
-                            beverageOptions.push('has cup');
-                        } else {
-                            beverageOptions.push('needs cup');
-                        }
-                    }
-                } else if (section.type === 'conditional') {
-                    // Only include conditional values if they're actually visible and set
-                    const parentSection = config.sections.find(s => s.id === section.dependsOn);
-                    const parentInput = document.getElementById(`hidden_${section.dependsOn}`);
-                    
-                    if (parentInput && parentInput.value === section.showWhen && hiddenInput.value) {
-                        if (section.id === 'cupLocation') {
-                            beverageOptions.push(`cup: ${hiddenInput.value.toLowerCase()}`);
-                        }
-                    }
-                }
-            }
-        });
-        
-        return beverageOptions.length > 0 ? beverageOptions.join(', ') : '';
-    }
-    
-    return '';
-}
-
-
 
     // Function to update the order form when food selection changes
     function updateFoodOptions() {
@@ -842,42 +1648,6 @@ function getSelectedSubOptions() {
         }
         
         return checkedCount >= minRequired;
-    }
-
-    // Function to get selected sub-options for form submission
-    function getSelectedSubOptions() {
-        const foodSelect = document.getElementById('food');
-        const selectedFood = foodSelect.value;
-        
-        if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
-            return '';
-        }
-        
-        const config = FOOD_OPTIONS[selectedFood];
-        
-        if (config.type === 'single') {
-            const selectElement = document.getElementById('foodSubOptions');
-            return selectElement ? selectElement.value : '';
-        } else if (config.type === 'multiple') {
-            const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
-            const selected = Array.from(checkboxes).map(cb => cb.value);
-            return selected.length > 0 ? selected.join(', ') : '';
-        } else if (config.type === 'multiSection') {
-            let allSelections = [];
-            
-            config.sections.forEach(section => {
-                const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
-                const selected = Array.from(checkboxes).map(cb => cb.value);
-                
-                if (selected.length > 0) {
-                    allSelections.push(`${section.id}: ${selected.join(', ')}`);
-                }
-            });
-            
-            return allSelections.length > 0 ? allSelections.join(' | ') : '';
-        }
-        
-        return '';
     }
 
     // Function to validate form before submission
@@ -1808,610 +2578,4 @@ FOOD_OPTIONS['New Food Item'] = {
                 debugLog(`[ORDER PAGE] Form hidden - kitchen is closed`);
             }
         }
-    }
-
-    function showNewOrderNotification(orderCount = 1) {
-        const notification = document.getElementById('newOrderNotification');
-        if (notification) {
-            // Enhanced notification text with sound status
-            const soundStatus = userHasInteracted ? '🔔' : '🔇';
-            notification.innerHTML = `${soundStatus} ${orderCount} new order${orderCount > 1 ? 's' : ''} received!`;
-            notification.style.display = 'block';
-            notification.style.animation = 'pulse 1s infinite';
-            notification.style.backgroundColor = '#28A745';
-            notification.style.border = '3px solid #000';
-            notification.style.fontWeight = '700';
-            
-            // Add click to test sound if user hasn't interacted yet
-            if (!userHasInteracted) {
-                notification.style.cursor = 'pointer';
-                notification.title = 'Click to enable sound notifications';
-                notification.onclick = function() {
-                    enableAudioAfterUserGesture();
-                    playNewOrderSound(); // Test the sound
-                    this.onclick = null; // Remove click handler
-                    this.style.cursor = 'default';
-                    this.title = '';
-                };
-            }
-            
-            setTimeout(() => {
-                notification.style.display = 'none';
-                notification.style.animation = '';
-                notification.onclick = null;
-                notification.style.cursor = 'default';
-            }, 8000); // Show for 8 seconds
-        }
-    }
-
-    async function showPage(pageName) {
-        // Close existing real-time connection when changing pages
-        closeRealTimeConnection();
-        
-        // Stop fallback polling
-        stopEventDrivenUpdates();
-        
-        // Manager portal authentication
-        if (pageName === 'manager') {
-            const authenticated = await authenticateManager();
-            if (!authenticated) {
-                debugLog('[MANAGER ACCESS] Authentication failed');
-                window.location.href = window.location.pathname;
-                return;
-            }
-            debugLog('[MANAGER ACCESS] Authentication successful');
-        }
-        
-        document.querySelectorAll('.page').forEach(page => {
-            page.classList.remove('active');
-        });
-
-        if (pageName === 'manager') {
-            document.getElementById('managerPage').classList.add('active');
-            document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Manage Active Orders';
-            loadOrders();
-            checkKitchenStatus();
-            loadRecentOrders();
-            setupRealTimeUpdates(); // Real-time updates for manager
-        } else if (pageName === 'tracking') {
-            document.getElementById('trackingPage').classList.add('active');
-            document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering - Track Your Order';
-            loadOrderTracking();
-            loadRecentOrders();
-            setupRealTimeUpdates(); // Real-time updates for tracking
-        } else {
-            document.getElementById('orderPage').classList.add('active');
-            document.getElementById('headerSubtitle').textContent = '48 Hour Food Festival Catering';
-            checkKitchenStatus();
-            loadRecentOrders();
-            setupRealTimeUpdates(); // Real-time updates for order page
-        }
-    }
-
-    function logoutManager() {
-        if (confirm('Are you sure you want to logout?')) {
-            clearSession();
-            showMessage('success', 'Logged out successfully. Redirecting...');
-            setTimeout(() => {
-                window.location.href = window.location.pathname;
-            }, 1500);
-        }
-    }
-
-    // Manager functions
-    async function loadOrders() {
-        const loading = document.getElementById('loading');
-        const container = document.getElementById('ordersContainer');
-        const noOrdersMsg = document.getElementById('noOrders');
-        
-        if (loading) loading.style.display = 'block';
-        if (container) container.innerHTML = '';
-        if (noOrdersMsg) noOrdersMsg.style.display = 'none';
-        
-        try {
-            const response = await getOrders();
-            const orders = response.orders || [];
-            
-            if (loading) loading.style.display = 'none';
-            lastOrderCount = orders.length;
-            
-            if (orders.length === 0) {
-                if (noOrdersMsg) noOrdersMsg.style.display = 'block';
-            } else if (container) {
-                container.innerHTML = orders.map((order) => `
-                    <div class="order-card" data-order-id="${order.id}">
-                        <h3>Order #${order.id}</h3>
-                        <div class="order-info">
-                            <strong>Food:</strong> ${order.food}<br>
-                            <strong>Room:</strong> ${order.room}<br>
-                            <strong>Name:</strong> ${order.name}<br>
-                            ${order.comments ? `<strong>Comments:</strong> ${order.comments}<br>` : ''}
-                            <strong>Time:</strong> ${order.timestamp}<br>
-                            <span class="status-badge status-${order.status}">${order.status.replace(/-/g, ' ')}</span>
-                        </div>
-                        <div class="status-controls">
-                            ${order.status === 'pending' ? `
-                                <button class="status-btn" data-order-id="${order.id}" data-status="accepted" type="button">Accept</button>
-                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
-                            ` : ''}
-                            ${order.status === 'accepted' ? `
-                                <button class="status-btn" data-order-id="${order.id}" data-status="being-made" type="button">Start Making</button>
-                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
-                            ` : ''}
-                            ${order.status === 'being-made' ? `
-                                <button class="status-btn" data-order-id="${order.id}" data-status="being-delivered" type="button">Out for Delivery</button>
-                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
-                            ` : ''}
-                            ${order.status === 'being-delivered' ? `
-                                <button class="status-btn" data-order-id="${order.id}" data-status="completed" type="button">Complete</button>
-                                <button class="delete-btn" data-order-id="${order.id}" type="button">Delete</button>
-                            ` : ''}
-                        </div>
-                    </div>
-                `).join('');
-                
-                // Add event listeners
-                const statusButtons = container.querySelectorAll('.status-btn');
-                statusButtons.forEach(button => {
-                    button.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const orderId = this.getAttribute('data-order-id');
-                        const newStatus = this.getAttribute('data-status');
-                        
-                        debugLog(`[Button Click] Order: ${orderId}, New Status: ${newStatus}`);
-                        
-                        if (orderId && newStatus) {
-                            updateStatus(orderId, newStatus);
-                        }
-                    });
-                });
-
-                const deleteButtons = container.querySelectorAll('.delete-btn');
-                deleteButtons.forEach(button => {
-                    button.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const orderId = this.getAttribute('data-order-id');
-                        
-                        debugLog(`[Delete Button Click] Order: ${orderId}`);
-                        
-                        if (orderId) {
-                            deleteOrder(orderId);
-                        }
-                    });
-                });
-            }
-        } catch (error) {
-            console.error('Load orders error:', error.message);
-            if (loading) loading.style.display = 'none';
-            if (container) container.innerHTML = '<div class="error-message" style="display: block;">Failed to load orders. Please refresh.</div>';
-        }
-    }
-
-    async function updateStatus(orderId, newStatus) {
-        try {
-            debugLog(`[UPDATE STATUS] Starting update for Order ${orderId} to ${newStatus}`);
-            
-            const buttons = document.querySelectorAll('.status-btn');
-            buttons.forEach(btn => {
-                btn.disabled = true;
-                btn.textContent = 'Updating...';
-            });
-            
-            const result = await updateOrderStatus(orderId, newStatus);
-            debugLog(`[UPDATE STATUS] Success:`, result);
-            
-            showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
-            
-            // Force immediate refresh after successful update
-            setTimeout(() => {
-                loadOrders();
-                loadRecentOrders();
-            }, 500);
-            
-            debugLog(`[UPDATE STATUS] Status update completed - forced UI refresh`);
-            
-        } catch (error) {
-            debugLog('[UPDATE STATUS] Error:', error);
-            showMessage('error', 'Failed to update order status: ' + error.message);
-            
-            const buttons = document.querySelectorAll('.status-btn');
-            buttons.forEach(btn => {
-                btn.disabled = false;
-                const status = btn.getAttribute('data-status');
-                switch(status) {
-                    case 'accepted': btn.textContent = 'Accept'; break;
-                    case 'being-made': btn.textContent = 'Start Making'; break;
-                    case 'being-delivered': btn.textContent = 'Out for Delivery'; break;
-                    case 'completed': btn.textContent = 'Complete'; break;
-                }
-            });
-        }
-    }
-
-    async function clearAllOrders() {
-        if (!confirm('Are you sure you want to clear ALL orders? This will move all active orders to completed status.')) {
-            return;
-        }
-        
-        try {
-            await clearOrders();
-            showMessage('success', 'All orders cleared');
-            
-            // Force immediate refresh after clearing
-            setTimeout(() => {
-                loadOrders();
-                loadRecentOrders();
-            }, 500);
-            
-            debugLog(`[CLEAR ORDERS] All orders cleared - forced UI refresh`);
-            
-        } catch (error) {
-            console.error('Clear orders error:', error.message);
-            showMessage('error', 'Failed to clear orders. Please try again.');
-        }
-    }
-
-    // Order tracking functions
-    async function loadOrderTracking() {
-        const orderId = getOrderIdFromUrl();
-        if (!orderId) return;
-
-        const trackingOrderId = document.getElementById('trackingOrderId');
-        const trackingOrderDetails = document.getElementById('trackingOrderDetails');
-
-        if (trackingOrderId) trackingOrderId.textContent = `#${orderId}`;
-
-        try {
-            const response = await getOrder(orderId);
-            const order = response.order;
-
-            if (!order) {
-                if (trackingOrderDetails) {
-                    trackingOrderDetails.innerHTML = `
-                        <div class="error-message" style="display: block;">
-                            Order not found. It may have been completed or cancelled.
-                        </div>
-                    `;
-                }
-                return;
-            }
-
-            if (trackingOrderDetails) {
-                trackingOrderDetails.innerHTML = `
-                    <h3>${order.food}</h3>
-                    <p><strong>Room:</strong> ${order.room}</p>
-                    <p><strong>Name:</strong> ${order.name}</p>
-                    ${order.comments ? `<p><strong>Comments:</strong> ${order.comments}</p>` : ''}
-                    <p><strong>Order Time:</strong> ${order.timestamp}</p>
-                    <p><strong>Current Status:</strong> <span class="status-badge status-${order.status}">${order.status.replace(/-/g, ' ')}</span></p>
-                    ${order.completedAt ? `<p><strong>Completed At:</strong> ${order.completedAt}</p>` : ''}
-                `;
-            }
-
-            updateStatusTimeline(order.status);
-
-        } catch (error) {
-            console.error('Load order tracking error:', error.message);
-            if (trackingOrderDetails) {
-                trackingOrderDetails.innerHTML = `
-                    <div class="error-message" style="display: block;">
-                        Failed to load order details. Please refresh the page.
-                    </div>
-                `;
-            }
-        }
-    }
-
-    function updateStatusTimeline(currentStatus) {
-        const steps = ['pending', 'accepted', 'being-made', 'being-delivered', 'completed'];
-        const currentIndex = steps.indexOf(currentStatus);
-
-        document.querySelectorAll('.timeline-step').forEach((step, index) => {
-            const circle = step.querySelector('.timeline-circle');
-            step.classList.remove('active', 'completed');
-            
-            if (index < currentIndex) {
-                step.classList.add('completed');
-            } else if (index === currentIndex) {
-                step.classList.add('active');
-            }
-        });
-    }
-
-    // Recent orders functions
-    async function loadRecentOrders() {
-        const recentContainer = document.getElementById('completedOrdersList');
-        if (!recentContainer) return;
-
-        try {
-            const response = await getRecentOrders();
-            const recentOrders = response.orders || [];
-
-            if (recentOrders.length === 0) {
-                recentContainer.innerHTML = '<p style="color: #666; text-align: center;">No orders yet.</p>';
-            } else {
-                recentContainer.innerHTML = recentOrders
-                    .map(order => `
-                        <div class="completed-order ${order.isActive ? 'active-order' : ''}">
-                            <h4>Order #${order.id}</h4>
-                            <p><strong>Food:</strong> ${order.food}</p>
-                            <p><strong>Customer:</strong> ${order.name}</p>
-                            <p><strong>Room:</strong> ${order.room}</p>
-                            <p><strong>Status:</strong> <span class="status-badge status-${order.status}" style="display: inline; padding: 2px 8px; font-size: 0.8em;">${order.status.replace(/-/g, ' ')}</span></p>
-                            <p><strong>Time:</strong> ${order.timestamp}</p>
-                            ${order.completedAt ? `<p><strong>Completed:</strong> ${order.completedAt}</p>` : ''}
-                        </div>
-                    `).join('');
-            }
-        } catch (error) {
-            console.error('Load recent orders error:', error.message);
-            recentContainer.innerHTML = '<p style="color: #dc3545;">Failed to load recent orders.</p>';
-        }
-    }
-
-    // Initialize enhanced food system
-    function initEnhancedFoodSystem() {
-        // Add event listener to food dropdown
-        const foodSelect = document.getElementById('food');
-        if (foodSelect) {
-            foodSelect.addEventListener('change', updateFoodOptions);
-            
-            // Debug: Log when food changes
-            foodSelect.addEventListener('change', function() {
-                const selectedFood = this.value;
-                console.log('Selected food:', selectedFood);
-                if (FOOD_OPTIONS[selectedFood]) {
-                    console.log('Food config:', FOOD_OPTIONS[selectedFood]);
-                }
-            });
-        }
-        
-        // Add management interface in debug mode
-        addFoodManagementInterface();
-        
-        debugLog('🍔 Enhanced food selection system initialized');
-    }
-
-    // Initialize
-    function init() {
-        const currentPage = getCurrentPage();
-        
-        // Reset tracking variables
-        lastOrderCount = 0;
-        lastDataHash = '';
-        lastTrackingOrderData = null;
-        lastKitchenStatus = null;
-        lastRecentOrdersHash = '';
-        
-        showPage(currentPage);
-        
-        debugLog(`[INIT] Application initialized on ${currentPage} page with real-time updates`);
-    }
-
-    // Enhanced Event Listeners
-    function setupEventListeners() {
-        // Enhanced order form handling with food options
-        const orderForm = document.getElementById('orderForm');
-        if (orderForm) {
-            orderForm.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                // Validate food options first
-                if (!validateFoodOptions()) {
-                    return;
-                }
-                
-                const submitBtn = document.getElementById('submitBtn');
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Placing Order...';
-                
-                try {
-                    const formData = new FormData(this);
-                    const selectedSubOptions = getSelectedSubOptions();
-                    
-                    // Build the complete food description
-                    let foodDescription = formData.get('food');
-                    if (selectedSubOptions) {
-                        foodDescription += ` (${selectedSubOptions})`;
-                    }
-                    
-                    const order = {
-                        food: foodDescription,
-                        room: formData.get('room'),
-                        name: formData.get('name'),
-                        comments: formData.get('comments') || ''
-                    };
-                    
-                    const response = await addOrder(order);
-                    this.reset();
-                    
-                    // Clear dynamic options
-                    const existingOptions = document.querySelectorAll('[id^="foodOptions"]');
-                    existingOptions.forEach(el => el.remove());
-                    
-                    debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id}`);
-                    
-                    // Force refresh on manager page if it's open
-                    // This is a workaround since SSE might not be working
-                    if (response.order && response.order.id) {
-                        // Force recent orders to update
-                        setTimeout(() => {
-                            loadRecentOrders();
-                        }, 1000);
-                        
-                        // Redirect to tracking page
-                        setTimeout(() => {
-                            window.location.href = `?id=${response.order.id}`;
-                        }, 500);
-                    } else {
-                        showMessage('success', 'Order placed successfully!');
-                        // Force recent orders to update
-                        setTimeout(() => {
-                            loadRecentOrders();
-                        }, 1000);
-                    }
-                    
-                } catch (error) {
-                    console.error('Order submission error:', error.message);
-                    const errorMessage = error.message?.includes('HTTP 500') 
-                        ? 'Server error. Please check your API configuration and try again.' 
-                        : 'Failed to place order. Please try again.';
-                    showMessage('error', errorMessage);
-                } finally {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Place Order';
-                }
-            });
-        }
-
-        // ENHANCED: Triple click detection for direct manager authentication
-        let clickCount = 0;
-        let clickTimer = null;
-        const header = document.querySelector('.header');
-        if (header) {
-            header.addEventListener('click', async function() {
-                clickCount++;
-                
-                // Clear existing timer
-                if (clickTimer) {
-                    clearTimeout(clickTimer);
-                }
-                
-                // Check for triple click - go directly to authentication
-                if (clickCount === 3) {
-                    debugLog('[MANAGER ACCESS] Triple click detected - attempting direct authentication');
-                    clickCount = 0; // Reset immediately
-                    
-                    // Go directly to manager authentication
-                    const authenticated = await authenticateManager();
-                    if (authenticated) {
-                        debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
-                        window.location.href = '?page=manager';
-                    } else {
-                        debugLog('[MANAGER ACCESS] Authentication failed');
-                    }
-                } else {
-                    // Set timer to reset click count after 800ms
-                    clickTimer = setTimeout(() => {
-                        clickCount = 0;
-                    }, 800);
-                }
-            });
-        }
-
-        // Manager access link (now optional - triple click goes direct)
-        const managerLink = document.getElementById('managerAccess');
-        if (managerLink) {
-            managerLink.addEventListener('click', async function(e) {
-                e.preventDefault();
-                debugLog('[MANAGER ACCESS] Manager link clicked - going to authentication');
-                
-                // Hide the link immediately
-                this.style.display = 'none';
-                
-                // Go directly to manager authentication
-                const authenticated = await authenticateManager();
-                if (authenticated) {
-                    debugLog('[MANAGER ACCESS] Authentication successful - redirecting to manager page');
-                    window.location.href = '?page=manager';
-                } else {
-                    debugLog('[MANAGER ACCESS] Authentication failed');
-                }
-            });
-        }
-    }
-
-    // Test sound function for managers
-    function testNotificationSound() {
-        if (!userHasInteracted) {
-            enableAudioAfterUserGesture();
-        }
-        
-        playNewOrderSound();
-        
-        // Show feedback
-        showMessage('success', userHasInteracted ? 
-            'Sound test played! 🔔' : 
-            'Sound enabled! Click anywhere to activate audio, then test again.', 3000);
-    }
-
-    // Global function assignments for onclick handlers
-    window.toggleKitchenStatus = toggleKitchenStatus;
-    window.loadOrders = loadOrders;
-    window.clearAllOrders = clearAllOrders;
-    window.logoutManager = logoutManager;
-    window.goToOrderPage = goToOrderPage;
-    window.testNotificationSound = testNotificationSound;
-    window.adjustCounter = adjustCounter;
-    window.toggleBoolean = toggleBoolean;
-    window.toggleConditional = toggleConditional;
-
-    // Enhanced cleanup and navigation handling
-    window.addEventListener('beforeunload', function() {
-        closeRealTimeConnection();
-        stopEventDrivenUpdates();
-        debugLog('[CLEANUP] Stopping updates and closing connections before page unload');
-    });
-    
-    window.addEventListener('popstate', function() {
-        debugLog('[NAVIGATION] Popstate detected - reinitializing');
-        init();
-    });
-    
-    // Handle visibility changes to pause/resume updates when tab is hidden/shown
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden) {
-            debugLog('[VISIBILITY] Tab hidden - real-time connection will pause');
-        } else {
-            debugLog('[VISIBILITY] Tab visible - real-time connection will resume');
-            // Force a quick update when tab becomes visible again
-            setTimeout(() => {
-                const currentPage = getCurrentPage();
-                if (currentPage === 'manager') {
-                    loadOrders();
-                } else if (currentPage === 'tracking') {
-                    loadOrderTracking();
-                }
-                loadRecentOrders();
-            }, 500);
-        }
-    });
-    
-    // Show performance info on page load
-    setTimeout(() => {
-        if (DEBUG_MODE) {
-            console.log('📊 Real-time Updates Summary:');
-            console.log('🔄 Real-time events via Server-Sent Events (SSE) with polling fallback');
-            console.log('📡 Enhanced polling intervals:', UPDATE_INTERVALS);
-            console.log('🔔 Bell sound notifications enabled (/assets/bell.mp3)');
-            console.log('🎵 Audio requires user interaction (Chrome autoplay policy)');
-            console.log('🍔 Enhanced food selection system enabled');
-            console.log('🖱️ Triple-click header for direct manager authentication');
-            console.log('🎯 Click anywhere to enable audio notifications');
-            console.log('⚡ Real-time updates for: Kitchen status, New orders, Order status changes');
-            console.log('🔗 Connection indicator in top-right corner');
-        }
-    }, 1000);
-    
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            setupActivityTracking();
-            setupEventListeners();
-            initEnhancedFoodSystem();
-            init();
-            debugLog('[STARTUP] Application fully loaded with real-time updates and enhanced food selection');
-        });
-    } else {
-        setupActivityTracking();
-        setupEventListeners();
-        initEnhancedFoodSystem();
-        init();
-        debugLog('[STARTUP] Application fully loaded with real-time updates and enhanced food selection');
-    }
-
-})();
+    };
