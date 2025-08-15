@@ -2,6 +2,8 @@
 // Food options configuration at the top for easy editing
 // ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
 
+// ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
+
 // Easy-to-edit food configuration
 const FOOD_OPTIONS = {
     // Breakfast items
@@ -80,7 +82,7 @@ const FOOD_OPTIONS = {
             }
         ]
     },
-    // Hot Beverages with sugar selector and milk option
+    // Hot Beverages with sugar selector, milk option, and cup questions
     'Hot Chocolate': {
         type: 'beverageCustom',
         sections: [
@@ -98,6 +100,22 @@ const FOOD_OPTIONS = {
                 type: 'boolean',
                 options: ['Yes', 'No'],
                 default: 'Yes'
+            },
+            {
+                label: 'Do you have a cup?',
+                id: 'hasCup',
+                type: 'boolean',
+                options: ['Yes', 'No'],
+                default: 'No'
+            },
+            {
+                label: 'Where is your cup?',
+                id: 'cupLocation',
+                type: 'conditional',
+                dependsOn: 'hasCup',
+                showWhen: 'Yes',
+                options: ['With me', 'In the kitchen'],
+                default: 'With me'
             }
         ]
     },
@@ -118,6 +136,22 @@ const FOOD_OPTIONS = {
                 type: 'boolean',
                 options: ['Yes', 'No'],
                 default: 'Yes'
+            },
+            {
+                label: 'Do you have a cup?',
+                id: 'hasCup',
+                type: 'boolean',
+                options: ['Yes', 'No'],
+                default: 'No'
+            },
+            {
+                label: 'Where is your cup?',
+                id: 'cupLocation',
+                type: 'conditional',
+                dependsOn: 'hasCup',
+                showWhen: 'Yes',
+                options: ['With me', 'In the kitchen'],
+                default: 'With me'
             }
         ]
     },
@@ -138,11 +172,47 @@ const FOOD_OPTIONS = {
                 type: 'boolean',
                 options: ['Yes', 'No'],
                 default: 'Yes'
+            },
+            {
+                label: 'Do you have a cup?',
+                id: 'hasCup',
+                type: 'boolean',
+                options: ['Yes', 'No'],
+                default: 'No'
+            },
+            {
+                label: 'Where is your cup?',
+                id: 'cupLocation',
+                type: 'conditional',
+                dependsOn: 'hasCup',
+                showWhen: 'Yes',
+                options: ['With me', 'In the kitchen'],
+                default: 'With me'
             }
         ]
     },
-    // Water - no options needed
-    'Water': null,
+    // Water - with cup questions only
+    'Water': {
+        type: 'beverageCustom',
+        sections: [
+            {
+                label: 'Do you have a cup?',
+                id: 'hasCup',
+                type: 'boolean',
+                options: ['Yes', 'No'],
+                default: 'No'
+            },
+            {
+                label: 'Where is your cup?',
+                id: 'cupLocation',
+                type: 'conditional',
+                dependsOn: 'hasCup',
+                showWhen: 'Yes',
+                options: ['With me', 'In the kitchen'],
+                default: 'With me'
+            }
+        ]
+    },
     // Ice Cream
     'Ice Cream Cone': {
         type: 'single',
@@ -414,6 +484,27 @@ function generateOptionsHTML(foodItem) {
                         <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
                     </div>
                 `;
+            } else if (section.type === 'conditional') {
+                const defaultValue = section.default || section.options[0];
+                const isVisible = false; // Initially hidden
+                html += `
+                    <div class="conditional-control ${isVisible ? 'visible' : ''}" id="conditional_${section.id}">
+                        <label>${section.label}:</label>
+                        <div class="conditional-buttons">
+                `;
+                section.options.forEach((option, optionIndex) => {
+                    const isActive = option === defaultValue;
+                    html += `
+                        <button type="button" class="conditional-btn ${isActive ? 'active' : ''}" 
+                                onclick="toggleConditional('${section.id}', '${option}')"
+                                data-option="${option}">${option}</button>
+                    `;
+                });
+                html += `
+                        </div>
+                        <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
+                    </div>
+                `;
             }
             
             html += '</div>';
@@ -421,6 +512,214 @@ function generateOptionsHTML(foodItem) {
     }
 
     return html;
+}
+
+// Counter control function for beverages
+function adjustCounter(sectionId, change, min, max) {
+    const display = document.getElementById(`counter_${sectionId}`);
+    const hidden = document.getElementById(`hidden_${sectionId}`);
+    
+    if (!display || !hidden) return;
+    
+    let currentValue = parseInt(hidden.value) || 0;
+    let newValue = currentValue + change;
+    
+    // Enforce min/max bounds
+    if (newValue < min) newValue = min;
+    if (newValue > max) newValue = max;
+    
+    // Update display and hidden input
+    display.textContent = newValue;
+    hidden.value = newValue;
+    
+    // Update button states
+    const decreaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', -1"]`);
+    const increaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', 1"]`);
+    
+    if (decreaseBtn) decreaseBtn.disabled = (newValue <= min);
+    if (increaseBtn) increaseBtn.disabled = (newValue >= max);
+    
+    console.log(`Counter ${sectionId}: ${currentValue} → ${newValue} (range: ${min}-${max})`);
+}
+
+// Boolean toggle function for beverages
+function toggleBoolean(sectionId, selectedOption) {
+    const hidden = document.getElementById(`hidden_${sectionId}`);
+    const buttons = document.querySelectorAll(`[onclick*="toggleBoolean('${sectionId}'"]`);
+    
+    if (!hidden) return;
+    
+    // Update hidden input
+    hidden.value = selectedOption;
+    
+    // Update button states
+    buttons.forEach(btn => {
+        const option = btn.getAttribute('data-option');
+        if (option === selectedOption) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Handle conditional fields that depend on this boolean
+    handleConditionalVisibility(sectionId, selectedOption);
+    
+    console.log(`Boolean ${sectionId}: ${selectedOption}`);
+}
+
+// Conditional toggle function for beverages
+function toggleConditional(sectionId, selectedOption) {
+    const hidden = document.getElementById(`hidden_${sectionId}`);
+    const buttons = document.querySelectorAll(`[onclick*="toggleConditional('${sectionId}'"]`);
+    
+    if (!hidden) return;
+    
+    // Update hidden input
+    hidden.value = selectedOption;
+    
+    // Update button states
+    buttons.forEach(btn => {
+        const option = btn.getAttribute('data-option');
+        if (option === selectedOption) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    console.log(`Conditional ${sectionId}: ${selectedOption}`);
+}
+
+// Handle conditional field visibility
+function handleConditionalVisibility(dependencyId, selectedValue) {
+    const foodSelect = document.getElementById('food');
+    const selectedFood = foodSelect.value;
+    
+    if (!selectedFood || !FOOD_OPTIONS[selectedFood]) return;
+    
+    const config = FOOD_OPTIONS[selectedFood];
+    if (config.type !== 'beverageCustom') return;
+    
+    // Find conditional sections that depend on this field
+    config.sections.forEach(section => {
+        if (section.type === 'conditional' && section.dependsOn === dependencyId) {
+            const conditionalElement = document.getElementById(`conditional_${section.id}`);
+            const hiddenInput = document.getElementById(`hidden_${section.id}`);
+            
+            if (conditionalElement && hiddenInput) {
+                if (selectedValue === section.showWhen) {
+                    // Show the conditional field
+                    conditionalElement.classList.add('visible');
+                    
+                    // Ensure the hidden input has a value
+                    if (!hiddenInput.value) {
+                        hiddenInput.value = section.default || section.options[0];
+                        
+                        // Update button states
+                        const buttons = conditionalElement.querySelectorAll('.conditional-btn');
+                        buttons.forEach(btn => {
+                            const option = btn.getAttribute('data-option');
+                            if (option === hiddenInput.value) {
+                                btn.classList.add('active');
+                            } else {
+                                btn.classList.remove('active');
+                            }
+                        });
+                    }
+                } else {
+                    // Hide the conditional field
+                    conditionalElement.classList.remove('visible');
+                    
+                    // Clear the value since it's not relevant
+                    hiddenInput.value = '';
+                    
+                    // Reset button states
+                    const buttons = conditionalElement.querySelectorAll('.conditional-btn');
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                }
+            }
+        }
+    });
+}
+
+// Enhanced function to get selected sub-options including beverage customizations
+function getSelectedSubOptions() {
+    const foodSelect = document.getElementById('food');
+    const selectedFood = foodSelect.value;
+    
+    if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
+        return '';
+    }
+    
+    const config = FOOD_OPTIONS[selectedFood];
+    
+    if (config.type === 'single') {
+        const selectElement = document.getElementById('foodSubOptions');
+        return selectElement ? selectElement.value : '';
+    } else if (config.type === 'multiple') {
+        const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
+        const selected = Array.from(checkboxes).map(cb => cb.value);
+        return selected.length > 0 ? selected.join(', ') : '';
+    } else if (config.type === 'multiSection') {
+        let allSelections = [];
+        
+        config.sections.forEach(section => {
+            const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (selected.length > 0) {
+                allSelections.push(`${section.id}: ${selected.join(', ')}`);
+            }
+        });
+        
+        return allSelections.length > 0 ? allSelections.join(' | ') : '';
+    } else if (config.type === 'beverageCustom') {
+        let beverageOptions = [];
+        
+        config.sections.forEach(section => {
+            const hiddenInput = document.getElementById(`hidden_${section.id}`);
+            if (hiddenInput && hiddenInput.value) {
+                if (section.type === 'counter') {
+                    const value = parseInt(hiddenInput.value);
+                    if (value > 0) {
+                        beverageOptions.push(`${value} sugar`);
+                    } else {
+                        beverageOptions.push('no sugar');
+                    }
+                } else if (section.type === 'boolean') {
+                    const value = hiddenInput.value.toLowerCase();
+                    if (section.id === 'milk') {
+                        if (value === 'yes') {
+                            beverageOptions.push('with milk');
+                        } else {
+                            beverageOptions.push('no milk');
+                        }
+                    } else if (section.id === 'hasCup') {
+                        if (value === 'yes') {
+                            beverageOptions.push('has cup');
+                        } else {
+                            beverageOptions.push('needs cup');
+                        }
+                    }
+                } else if (section.type === 'conditional' && hiddenInput.value) {
+                    // Only include conditional values if they're actually set
+                    const parentSection = config.sections.find(s => s.id === section.dependsOn);
+                    const parentInput = document.getElementById(`hidden_${section.dependsOn}`);
+                    
+                    if (parentInput && parentInput.value === section.showWhen) {
+                        if (section.id === 'cupLocation') {
+                            beverageOptions.push(`cup: ${hiddenInput.value.toLowerCase()}`);
+                        }
+                    }
+                }
+            }
+        });
+        
+        return beverageOptions.length > 0 ? beverageOptions.join(', ') : '';
+    }
+    
+    return '';
 }
 
 // Counter control function for beverages
@@ -2108,6 +2407,7 @@ FOOD_OPTIONS['New Food Item'] = {
     window.testNotificationSound = testNotificationSound;
     window.adjustCounter = adjustCounter;
     window.toggleBoolean = toggleBoolean;
+    window.toggleConditional = toggleConditional;
 
     // Enhanced cleanup and navigation handling
     window.addEventListener('beforeunload', function() {
