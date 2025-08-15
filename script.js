@@ -236,6 +236,45 @@ const FOOD_OPTIONS = {
 (function() {
     'use strict';
     
+    // ========== VARIABLE DECLARATIONS (MOVED TO TOP) ==========
+    
+    // Enhanced debug mode with performance tracking
+    const DEBUG_MODE = false;
+    let performanceMetrics = {
+        requests: 0,
+        averageResponseTime: 0,
+        lastRequestTime: 0
+    };
+    
+    // Server-Sent Events connection for real-time updates
+    let eventSource = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    const RECONNECT_DELAY = 2000;
+    let sseSupported = true;
+    let isUsingPolling = false;
+    
+    // Enhanced sound notification system using uploaded bell sound
+    let audioContext = null;
+    let userHasInteracted = false;
+    
+    // SHORTER intervals for fallback polling to compensate for no real-time updates
+    const UPDATE_INTERVALS = {
+        manager: 2000,     // 2 seconds for manager (needs very frequent updates)
+        tracking: 3000,    // 3 seconds for tracking
+        order: 5000        // 5 seconds for order page
+    };
+    
+    let lastDataHash = '';
+    let lastOrderCount = 0;
+    let updateCheckInterval;
+    let lastTrackingOrderData = null;
+    let lastKitchenStatus = null;
+    let lastRecentOrdersHash = '';
+    
+    // Kitchen status management
+    let kitchenOpen = false;
+    
     // ========== AUTHENTICATION SYSTEM ==========
     
     // Obfuscated authentication data
@@ -783,9 +822,11 @@ const FOOD_OPTIONS = {
         playNewOrderSound();
         
         // Show feedback
-        showMessage('success', userHasInteracted ? 
-            'Sound test played! 🔔' : 
-            'Sound enabled! Click anywhere to activate audio, then test again.', 3000);
+        if (typeof showMessage === 'function') {
+            showMessage('success', userHasInteracted ? 
+                'Sound test played! 🔔' : 
+                'Sound enabled! Click anywhere to activate audio, then test again.', 3000);
+        }
     }
 
     // Global function assignments for onclick handlers
@@ -942,6 +983,12 @@ const FOOD_OPTIONS = {
     
     // Enhanced keyboard shortcuts for managers
     function setupKeyboardShortcuts() {
+        // Only set up if DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupKeyboardShortcuts);
+            return;
+        }
+        
         document.addEventListener('keydown', function(e) {
             // Only enable shortcuts on manager page
             if (getCurrentPage() !== 'manager') return;
@@ -977,8 +1024,26 @@ const FOOD_OPTIONS = {
     
     // Auto-save form data to prevent loss
     function setupAutoSave() {
+        // Only set up if DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupAutoSave);
+            return;
+        }
+        
         const orderForm = document.getElementById('orderForm');
         if (!orderForm) return;
+        
+        // Check if localStorage is available
+        let storageAvailable = false;
+        try {
+            const test = '__storage_test__';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            storageAvailable = true;
+        } catch (e) {
+            debugLog('💾 Auto-save disabled: localStorage not available');
+            return;
+        }
         
         const AUTOSAVE_KEY = 'food_order_draft';
         
@@ -1701,14 +1766,6 @@ FOOD_OPTIONS['New Food Item'] = {
     
     // ========== REAL-TIME UPDATES SYSTEM ==========
     
-    // Server-Sent Events connection for real-time updates
-    let eventSource = null;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 3;
-    const RECONNECT_DELAY = 2000;
-    let sseSupported = true;
-    let isUsingPolling = false;
-    
     // Setup Server-Sent Events connection
     function setupRealTimeUpdates() {
         if (eventSource) {
@@ -1925,14 +1982,6 @@ FOOD_OPTIONS['New Food Item'] = {
         }
     }
     
-    // Enhanced debug mode with performance tracking
-    const DEBUG_MODE = false;
-    let performanceMetrics = {
-        requests: 0,
-        averageResponseTime: 0,
-        lastRequestTime: 0
-    };
-    
     function debugLog(...args) {
         if (DEBUG_MODE) {
             console.log(...args);
@@ -1995,20 +2044,6 @@ FOOD_OPTIONS['New Food Item'] = {
 
     // ========== REDUCED FREQUENCY UPDATE SYSTEM (FALLBACK) ==========
     
-    let lastDataHash = '';
-    let lastOrderCount = 0;
-    let updateCheckInterval;
-    let lastTrackingOrderData = null;
-    let lastKitchenStatus = null;
-    let lastRecentOrdersHash = '';
-    
-    // SHORTER intervals for fallback polling to compensate for no real-time updates
-    const UPDATE_INTERVALS = {
-        manager: 2000,     // 2 seconds for manager (needs very frequent updates)
-        tracking: 3000,    // 3 seconds for tracking
-        order: 5000        // 5 seconds for order page
-    };
-    
     function calculateDataHash(orders, recentOrders, kitchenStatus) {
         const dataString = JSON.stringify({
             orders: orders.map(o => `${o.id}-${o.status}-${o.timestamp}`),
@@ -2018,10 +2053,6 @@ FOOD_OPTIONS['New Food Item'] = {
         });
         return btoa(dataString).slice(0, 20);
     }
-    
-    // Enhanced sound notification system using uploaded bell sound
-    let audioContext = null;
-    let userHasInteracted = false;
     
     // Initialize audio context after user interaction
     function initAudioContext() {
@@ -2491,9 +2522,6 @@ FOOD_OPTIONS['New Food Item'] = {
         }
     }
 
-    // Kitchen status management
-    let kitchenOpen = false;
-
     async function toggleKitchenStatus() {
         try {
             const previousStatus = kitchenOpen;
@@ -2577,5 +2605,6 @@ FOOD_OPTIONS['New Food Item'] = {
                 formContainer.style.display = 'none';
                 debugLog(`[ORDER PAGE] Form hidden - kitchen is closed`);
             }
-        }
-    };
+            debugLog(`[ORDER PAGE] Form hidden - kitchen is closed`);
+            }
+        };
