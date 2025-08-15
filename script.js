@@ -1,6 +1,5 @@
 // script.js - Enhanced Food Ordering System with Real-time Updates via SSE
 // Food options configuration at the top for easy editing
-
 // ========== ENHANCED FOOD OPTIONS CONFIGURATION ==========
 
 // Easy-to-edit food configuration
@@ -81,6 +80,69 @@ const FOOD_OPTIONS = {
             }
         ]
     },
+    // Hot Beverages with sugar selector and milk option
+    'Hot Chocolate': {
+        type: 'beverageCustom',
+        sections: [
+            {
+                label: 'Sugar (teaspoons)',
+                id: 'sugar',
+                type: 'counter',
+                min: 0,
+                max: 6,
+                default: 2
+            },
+            {
+                label: 'Milk',
+                id: 'milk',
+                type: 'boolean',
+                options: ['Yes', 'No'],
+                default: 'Yes'
+            }
+        ]
+    },
+    'Cappuccino': {
+        type: 'beverageCustom',
+        sections: [
+            {
+                label: 'Sugar (teaspoons)',
+                id: 'sugar',
+                type: 'counter',
+                min: 0,
+                max: 6,
+                default: 1
+            },
+            {
+                label: 'Milk',
+                id: 'milk',
+                type: 'boolean',
+                options: ['Yes', 'No'],
+                default: 'Yes'
+            }
+        ]
+    },
+    'Tea': {
+        type: 'beverageCustom',
+        sections: [
+            {
+                label: 'Sugar (teaspoons)',
+                id: 'sugar',
+                type: 'counter',
+                min: 0,
+                max: 6,
+                default: 1
+            },
+            {
+                label: 'Milk',
+                id: 'milk',
+                type: 'boolean',
+                options: ['Yes', 'No'],
+                default: 'Yes'
+            }
+        ]
+    },
+    // Water - no options needed
+    'Water': null,
     // Ice Cream
     'Ice Cream Cone': {
         type: 'single',
@@ -249,71 +311,231 @@ const FOOD_OPTIONS = {
     
     // ========== ENHANCED FOOD SELECTION SYSTEM ==========
     
-    // Function to generate dynamic options HTML
-    function generateOptionsHTML(foodItem) {
-        const config = FOOD_OPTIONS[foodItem];
-        if (!config) return '';
+// Enhanced function to generate dynamic options HTML (replaces existing generateOptionsHTML function)
+function generateOptionsHTML(foodItem) {
+    const config = FOOD_OPTIONS[foodItem];
+    if (!config) return '';
 
-        let html = '';
+    let html = '';
 
-        if (config.type === 'single') {
-            html = `
-                <div class="form-group" id="foodOptions">
-                    <label for="foodSubOptions">${config.label}:</label>
-                    <select id="foodSubOptions" name="foodSubOptions" required>
-                        <option value="">Select an option...</option>
+    if (config.type === 'single') {
+        html = `
+            <div class="form-group" id="foodOptions">
+                <label for="foodSubOptions">${config.label}:</label>
+                <select id="foodSubOptions" name="foodSubOptions" required>
+                    <option value="">Select an option...</option>
+        `;
+        config.options.forEach(option => {
+            html += `<option value="${option}">${option}</option>`;
+        });
+        html += '</select></div>';
+    } else if (config.type === 'multiple') {
+        html = `
+            <div class="form-group" id="foodOptions">
+                <label for="foodSubOptions">${config.label}:</label>
+                <div class="checkbox-group">
+        `;
+        config.options.forEach((option, index) => {
+            html += `
+                <div class="checkbox-item">
+                    <input type="checkbox" id="option${index}" name="foodSubOptions" value="${option}">
+                    <label for="option${index}">${option}</label>
+                </div>
             `;
-            config.options.forEach(option => {
-                html += `<option value="${option}">${option}</option>`;
-            });
-            html += '</select></div>';
-        } else if (config.type === 'multiple') {
-            html = `
-                <div class="form-group" id="foodOptions">
-                    <label for="foodSubOptions">${config.label}:</label>
-                    <div class="checkbox-group">
+        });
+        html += '</div></div>';
+    } else if (config.type === 'multiSection') {
+        // Handle multi-section configurations (like Chicken Wraps)
+        config.sections.forEach((section, sectionIndex) => {
+            html += `
+                <div class="form-group" id="foodOptions${sectionIndex}">
+                    <label>${section.label}:</label>
             `;
-            config.options.forEach((option, index) => {
+            
+            if (section.minRequired > 0) {
+                html += `<small style="color: #FF6B35; font-weight: 600; display: block; margin-bottom: 10px;">*Minimum ${section.minRequired} selections required</small>`;
+            }
+            
+            html += '<div class="checkbox-group">';
+            section.options.forEach((option, optionIndex) => {
                 html += `
                     <div class="checkbox-item">
-                        <input type="checkbox" id="option${index}" name="foodSubOptions" value="${option}">
-                        <label for="option${index}">${option}</label>
+                        <input type="checkbox" 
+                               id="${section.id}_option${optionIndex}" 
+                               name="foodSubOptions_${section.id}" 
+                               value="${option}"
+                               data-section="${section.id}"
+                               data-min-required="${section.minRequired || 0}">
+                        <label for="${section.id}_option${optionIndex}">${option}</label>
                     </div>
                 `;
             });
             html += '</div></div>';
-        } else if (config.type === 'multiSection') {
-            // Handle multi-section configurations (like Chicken Wraps)
-            config.sections.forEach((section, sectionIndex) => {
+        });
+    } else if (config.type === 'beverageCustom') {
+        // Handle beverage customization with counters and boolean options
+        config.sections.forEach((section, sectionIndex) => {
+            html += `<div class="form-group beverage-option" id="foodOptions${sectionIndex}">`;
+            
+            if (section.type === 'counter') {
+                const defaultValue = section.default || section.min || 0;
                 html += `
-                    <div class="form-group" id="foodOptions${sectionIndex}">
+                    <div class="counter-control">
                         <label>${section.label}:</label>
-                `;
-                
-                if (section.minRequired > 0) {
-                    html += `<small style="color: #FF6B35; font-weight: 600; display: block; margin-bottom: 10px;">*Minimum ${section.minRequired} selections required</small>`;
-                }
-                
-                html += '<div class="checkbox-group">';
-                section.options.forEach((option, optionIndex) => {
-                    html += `
-                        <div class="checkbox-item">
-                            <input type="checkbox" 
-                                   id="${section.id}_option${optionIndex}" 
-                                   name="foodSubOptions_${section.id}" 
-                                   value="${option}"
-                                   data-section="${section.id}"
-                                   data-min-required="${section.minRequired || 0}">
-                            <label for="${section.id}_option${optionIndex}">${option}</label>
+                        <div class="counter-buttons">
+                            <button type="button" class="counter-btn" 
+                                    onclick="adjustCounter('${section.id}', -1, ${section.min}, ${section.max})"
+                                    data-action="decrease">−</button>
+                            <div class="counter-display" id="counter_${section.id}">${defaultValue}</div>
+                            <button type="button" class="counter-btn" 
+                                    onclick="adjustCounter('${section.id}', 1, ${section.min}, ${section.max})"
+                                    data-action="increase">+</button>
                         </div>
+                        <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
+                    </div>
+                `;
+            } else if (section.type === 'boolean') {
+                const defaultValue = section.default || section.options[0];
+                html += `
+                    <div class="boolean-control">
+                        <label>${section.label}:</label>
+                        <div class="boolean-buttons">
+                `;
+                section.options.forEach((option, optionIndex) => {
+                    const isActive = option === defaultValue;
+                    html += `
+                        <button type="button" class="boolean-btn ${isActive ? 'active' : ''}" 
+                                onclick="toggleBoolean('${section.id}', '${option}')"
+                                data-option="${option}">${option}</button>
                     `;
                 });
-                html += '</div></div>';
-            });
-        }
-
-        return html;
+                html += `
+                        </div>
+                        <input type="hidden" id="hidden_${section.id}" name="beverage_${section.id}" value="${defaultValue}">
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+        });
     }
+
+    return html;
+}
+
+// Counter control function for beverages
+function adjustCounter(sectionId, change, min, max) {
+    const display = document.getElementById(`counter_${sectionId}`);
+    const hidden = document.getElementById(`hidden_${sectionId}`);
+    
+    if (!display || !hidden) return;
+    
+    let currentValue = parseInt(hidden.value) || 0;
+    let newValue = currentValue + change;
+    
+    // Enforce min/max bounds
+    if (newValue < min) newValue = min;
+    if (newValue > max) newValue = max;
+    
+    // Update display and hidden input
+    display.textContent = newValue;
+    hidden.value = newValue;
+    
+    // Update button states
+    const decreaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', -1"]`);
+    const increaseBtn = document.querySelector(`[onclick*="adjustCounter('${sectionId}', 1"]`);
+    
+    if (decreaseBtn) decreaseBtn.disabled = (newValue <= min);
+    if (increaseBtn) increaseBtn.disabled = (newValue >= max);
+    
+    console.log(`Counter ${sectionId}: ${currentValue} → ${newValue} (range: ${min}-${max})`);
+}
+
+// Boolean toggle function for beverages
+function toggleBoolean(sectionId, selectedOption) {
+    const hidden = document.getElementById(`hidden_${sectionId}`);
+    const buttons = document.querySelectorAll(`[onclick*="toggleBoolean('${sectionId}'"]`);
+    
+    if (!hidden) return;
+    
+    // Update hidden input
+    hidden.value = selectedOption;
+    
+    // Update button states
+    buttons.forEach(btn => {
+        const option = btn.getAttribute('data-option');
+        if (option === selectedOption) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    console.log(`Boolean ${sectionId}: ${selectedOption}`);
+}
+
+// Enhanced function to get selected sub-options including beverage customizations
+function getSelectedSubOptions() {
+    const foodSelect = document.getElementById('food');
+    const selectedFood = foodSelect.value;
+    
+    if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
+        return '';
+    }
+    
+    const config = FOOD_OPTIONS[selectedFood];
+    
+    if (config.type === 'single') {
+        const selectElement = document.getElementById('foodSubOptions');
+        return selectElement ? selectElement.value : '';
+    } else if (config.type === 'multiple') {
+        const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
+        const selected = Array.from(checkboxes).map(cb => cb.value);
+        return selected.length > 0 ? selected.join(', ') : '';
+    } else if (config.type === 'multiSection') {
+        let allSelections = [];
+        
+        config.sections.forEach(section => {
+            const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (selected.length > 0) {
+                allSelections.push(`${section.id}: ${selected.join(', ')}`);
+            }
+        });
+        
+        return allSelections.length > 0 ? allSelections.join(' | ') : '';
+    } else if (config.type === 'beverageCustom') {
+        let beverageOptions = [];
+        
+        config.sections.forEach(section => {
+            const hiddenInput = document.getElementById(`hidden_${section.id}`);
+            if (hiddenInput && hiddenInput.value) {
+                if (section.type === 'counter') {
+                    const value = parseInt(hiddenInput.value);
+                    if (value > 0) {
+                        beverageOptions.push(`${value} sugar`);
+                    } else {
+                        beverageOptions.push('no sugar');
+                    }
+                } else if (section.type === 'boolean') {
+                    const value = hiddenInput.value.toLowerCase();
+                    if (value === 'yes') {
+                        beverageOptions.push('with milk');
+                    } else {
+                        beverageOptions.push('no milk');
+                    }
+                }
+            }
+        });
+        
+        return beverageOptions.length > 0 ? beverageOptions.join(', ') : '';
+    }
+    
+    return '';
+}
+
+
 
     // Function to update the order form when food selection changes
     function updateFoodOptions() {
@@ -1884,6 +2106,8 @@ FOOD_OPTIONS['New Food Item'] = {
     window.logoutManager = logoutManager;
     window.goToOrderPage = goToOrderPage;
     window.testNotificationSound = testNotificationSound;
+    window.adjustCounter = adjustCounter;
+    window.toggleBoolean = toggleBoolean;
 
     // Enhanced cleanup and navigation handling
     window.addEventListener('beforeunload', function() {
