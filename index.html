@@ -205,6 +205,7 @@
             cursor: pointer;
             flex: 1;
             color: #000;
+            user-select: none;
         }
 
         .checkbox-item input[type="checkbox"]:checked + label {
@@ -212,8 +213,50 @@
             font-weight: 600;
         }
 
+        .checkbox-item input[type="checkbox"]:checked {
+            transform: scale(1.1);
+        }
+
+        /* Checked state for checkbox items */
+        .checkbox-item:has(input[type="checkbox"]:checked) {
+            background: #FFF3E0;
+            border-color: #FF6B35;
+            box-shadow: 0 2px 5px rgba(255, 107, 53, 0.2);
+        }
+
+        /* Validation feedback styling */
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        /* Section divider for multiple option groups */
+        [id^="foodOptions"] {
+            animation: slideDown 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        [id^="foodOptions"]:not(:first-of-type) {
+            padding-top: 15px;
+            border-top: 2px dashed #e9ecef;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         /* Ensure dynamic options inherit form styling */
-        #foodOptions select {
+        #foodOptions select, [id^="foodOptions"] select {
             width: 100%;
             padding: 15px;
             border: 3px solid #000;
@@ -225,7 +268,7 @@
             font-weight: 500;
         }
 
-        #foodOptions select:focus {
+        #foodOptions select:focus, [id^="foodOptions"] select:focus {
             outline: none;
             border-color: #FF6B35;
             background: white;
@@ -233,7 +276,7 @@
             transform: translateY(-2px);
         }
 
-        #foodOptions label {
+        #foodOptions label, [id^="foodOptions"] label {
             display: block;
             margin-bottom: 8px;
             font-weight: 700;
@@ -716,7 +759,8 @@
                         <div class="success-message" id="successMessage"></div>
                         <div class="error-message" id="errorMessage"></div>
                         
-<div class="form-group">
+                        <form id="orderForm">
+                            <div class="form-group">
                                 <label for="food">What food do you want:</label>
                                 <select id="food" name="food" required>
                                     <option value="">Select a food item...</option>
@@ -748,7 +792,11 @@
                                 </select>
                             </div>
 
-                            <!-- Dynamic options will be inserted here -->
+                            <!-- Dynamic options will be inserted here automatically when food is selected -->
+                            <!-- For Chicken Wrap: Multiple checkboxes for "Inside" (min 2 required) and "Additional" options -->
+                            <!-- For Bean Nachos: Multiple checkboxes for ingredients -->
+                            <!-- For Loaded Fries: Multiple checkboxes for toppings -->
+                            <!-- For other items: Single dropdown selection or no options -->
 
                             <div class="form-group">
                                 <label for="comments">Special requests / Allergies (Optional):</label>

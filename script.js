@@ -8,20 +8,20 @@ const FOOD_OPTIONS = {
     // Breakfast items
     'Up and Go': {
         type: 'single',
-        label: 'Milk Type',
-        options: ['With Milk', 'With Sugar']
+        label: 'Flavor',
+        options: ['Chocolate', 'Vanilla', 'Strawberry']
     },
     'Cornflakes': {
         type: 'single',
-        label: 'Milk Type',
-        options: ['With Milk', 'With Sugar']
+        label: 'Additions',
+        options: ['With Milk', 'With Sugar', 'With Milk and Sugar']
     },
     'Coco Pops': {
         type: 'single',
         label: 'Additions',
-        options: ['With Milk', 'With Sugar']
+        options: ['With Milk', 'With Sugar', 'With Milk and Sugar']
     },
-    // Wraps
+    // Wraps - THIS IS THE KEY ONE WITH MULTI-SECTION
     'Chicken Wrap': {
         type: 'multiSection',
         sections: [
@@ -84,20 +84,20 @@ const FOOD_OPTIONS = {
     // Ice Cream
     'Ice Cream Cone': {
         type: 'single',
-        label: 'Flavour',
-        options: ['Cone', 'Fruit Salad']
+        label: 'Type',
+        options: ['Cone']
     },
     'Fruit Salad': {
         type: 'single',
-        label: 'Type',
+        label: 'Size',
         options: ['Regular', 'Large']
     },
-    // Extras
-    'Ice Blocks': null, // No options needed
-    'Up and Go Extra': null, // No options needed
-    'Muesli Bars': null, // No options needed
-    'Mince and Cheese Pies': null, // No options needed
-    'Vegan Pies': null // No options needed
+    // Extras - No options needed for these
+    'Ice Blocks': null,
+    'Up and Go Extra': null,
+    'Muesli Bars': null,
+    'Mince and Cheese Pies': null,
+    'Vegan Pies': null
 };
 
 // ========== MAIN APPLICATION ==========
@@ -107,8 +107,11 @@ const FOOD_OPTIONS = {
     
     // ========== AUTHENTICATION SYSTEM ==========
     
-    // Authentication configuration
+    // Obfuscated authentication data
     const AUTH_CONFIG = {
+        // Base64 encoded
+        key: 'S2FlZHluSXNDb29s',
+        salt: 'food_mgr_2025',
         sessionKey: 'manager_session_v2'
     };
     
@@ -116,28 +119,19 @@ const FOOD_OPTIONS = {
     const SESSION_DURATION = 60 * 60 * 1000; // 1 hour
     const ACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hour inactivity
     
-    // Get authentication key from server
-    async function getAuthKey() {
+    // Decode authentication key
+    function getAuthKey() {
         try {
-            debugLog('[AUTH] Fetching manager key from server');
-            const response = await fetch('/api/auth-key');
-            if (!response.ok) {
-                debugLog('[AUTH] Failed to fetch auth key:', response.status);
-                return null;
-            }
-            const data = await response.json();
-            debugLog('[AUTH] Auth key received from server');
-            return data.key;
-        } catch (error) {
-            debugLog('[AUTH] Error fetching auth key:', error.message);
+            return atob(AUTH_CONFIG.key);
+        } catch (e) {
             return null;
         }
     }
     
     // Validate password
-    async function validateCredentials(input) {
+    function validateCredentials(input) {
         if (!input || typeof input !== 'string') return false;
-        const expected = await getAuthKey();
+        const expected = getAuthKey();
         if (!expected) return false;
         return input === expected;
     }
@@ -208,7 +202,7 @@ const FOOD_OPTIONS = {
     }
     
     // Main authentication function
-    async function authenticateManager() {
+    function authenticateManager() {
         if (isSessionValid()) {
             updateSessionActivity();
             return true;
@@ -217,8 +211,7 @@ const FOOD_OPTIONS = {
         const credentials = prompt('Enter manager access code:');
         if (!credentials) return false;
         
-        const isValid = await validateCredentials(credentials);
-        if (isValid) {
+        if (validateCredentials(credentials)) {
             if (createSession()) {
                 return true;
             } else {
@@ -261,20 +254,25 @@ const FOOD_OPTIONS = {
         const config = FOOD_OPTIONS[foodItem];
         if (!config) return '';
 
-        let html = `
-            <div class="form-group" id="foodOptions">
-                <label for="foodSubOptions">${config.label}:</label>
-        `;
+        let html = '';
 
         if (config.type === 'single') {
-            html += '<select id="foodSubOptions" name="foodSubOptions" required>';
-            html += '<option value="">Select an option...</option>';
+            html = `
+                <div class="form-group" id="foodOptions">
+                    <label for="foodSubOptions">${config.label}:</label>
+                    <select id="foodSubOptions" name="foodSubOptions" required>
+                        <option value="">Select an option...</option>
+            `;
             config.options.forEach(option => {
                 html += `<option value="${option}">${option}</option>`;
             });
-            html += '</select>';
+            html += '</select></div>';
         } else if (config.type === 'multiple') {
-            html += '<div class="checkbox-group">';
+            html = `
+                <div class="form-group" id="foodOptions">
+                    <label for="foodSubOptions">${config.label}:</label>
+                    <div class="checkbox-group">
+            `;
             config.options.forEach((option, index) => {
                 html += `
                     <div class="checkbox-item">
@@ -283,22 +281,47 @@ const FOOD_OPTIONS = {
                     </div>
                 `;
             });
-            html += '</div>';
+            html += '</div></div>';
+        } else if (config.type === 'multiSection') {
+            // Handle multi-section configurations (like Chicken Wraps)
+            config.sections.forEach((section, sectionIndex) => {
+                html += `
+                    <div class="form-group" id="foodOptions${sectionIndex}">
+                        <label>${section.label}:</label>
+                `;
+                
+                if (section.minRequired > 0) {
+                    html += `<small style="color: #FF6B35; font-weight: 600; display: block; margin-bottom: 10px;">*Minimum ${section.minRequired} selections required</small>`;
+                }
+                
+                html += '<div class="checkbox-group">';
+                section.options.forEach((option, optionIndex) => {
+                    html += `
+                        <div class="checkbox-item">
+                            <input type="checkbox" 
+                                   id="${section.id}_option${optionIndex}" 
+                                   name="foodSubOptions_${section.id}" 
+                                   value="${option}"
+                                   data-section="${section.id}"
+                                   data-min-required="${section.minRequired || 0}">
+                            <label for="${section.id}_option${optionIndex}">${option}</label>
+                        </div>
+                    `;
+                });
+                html += '</div></div>';
+            });
         }
 
-        html += '</div>';
         return html;
     }
 
     // Function to update the order form when food selection changes
     function updateFoodOptions() {
         const foodSelect = document.getElementById('food');
-        const existingOptions = document.getElementById('foodOptions');
         
-        // Remove existing options
-        if (existingOptions) {
-            existingOptions.remove();
-        }
+        // Remove ALL existing options (handle multiple sections)
+        const existingOptions = document.querySelectorAll('[id^="foodOptions"]');
+        existingOptions.forEach(el => el.remove());
 
         const selectedFood = foodSelect.value;
         if (selectedFood && FOOD_OPTIONS[selectedFood]) {
@@ -306,7 +329,57 @@ const FOOD_OPTIONS = {
             
             // Insert after the food selection
             foodSelect.closest('.form-group').insertAdjacentHTML('afterend', optionsHTML);
+            
+            // Add validation for multi-section checkboxes
+            if (FOOD_OPTIONS[selectedFood].type === 'multiSection') {
+                setupMultiSectionValidation(selectedFood);
+            }
         }
+    }
+
+    // Function to setup validation for multi-section options
+    function setupMultiSectionValidation(foodItem) {
+        const config = FOOD_OPTIONS[foodItem];
+        if (!config || config.type !== 'multiSection') return;
+
+        config.sections.forEach(section => {
+            if (section.minRequired > 0) {
+                const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]`);
+                
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', function() {
+                        validateSection(section.id, section.minRequired);
+                    });
+                });
+            }
+        });
+    }
+
+    // Function to validate a section's minimum requirements
+    function validateSection(sectionId, minRequired) {
+        const checkboxes = document.querySelectorAll(`input[data-section="${sectionId}"]`);
+        const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        
+        // Visual feedback for validation
+        const sectionContainer = checkboxes[0]?.closest('.form-group');
+        if (sectionContainer) {
+            const label = sectionContainer.querySelector('label');
+            const smallText = sectionContainer.querySelector('small');
+            
+            if (checkedCount < minRequired) {
+                if (smallText) {
+                    smallText.style.color = '#DC3545';
+                    smallText.innerHTML = `*Minimum ${minRequired} selections required (${checkedCount} selected)`;
+                }
+            } else {
+                if (smallText) {
+                    smallText.style.color = '#28A745';
+                    smallText.innerHTML = `✓ ${checkedCount} selected`;
+                }
+            }
+        }
+        
+        return checkedCount >= minRequired;
     }
 
     // Function to get selected sub-options for form submission
@@ -327,9 +400,48 @@ const FOOD_OPTIONS = {
             const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
             const selected = Array.from(checkboxes).map(cb => cb.value);
             return selected.length > 0 ? selected.join(', ') : '';
+        } else if (config.type === 'multiSection') {
+            let allSelections = [];
+            
+            config.sections.forEach(section => {
+                const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
+                const selected = Array.from(checkboxes).map(cb => cb.value);
+                
+                if (selected.length > 0) {
+                    allSelections.push(`${section.id}: ${selected.join(', ')}`);
+                }
+            });
+            
+            return allSelections.length > 0 ? allSelections.join(' | ') : '';
         }
         
         return '';
+    }
+
+    // Function to validate form before submission
+    function validateFoodOptions() {
+        const foodSelect = document.getElementById('food');
+        const selectedFood = foodSelect.value;
+        
+        if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
+            return true; // No special validation needed
+        }
+        
+        const config = FOOD_OPTIONS[selectedFood];
+        
+        if (config.type === 'multiSection') {
+            for (const section of config.sections) {
+                if (section.minRequired > 0) {
+                    const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
+                    if (checkboxes.length < section.minRequired) {
+                        alert(`Please select at least ${section.minRequired} options for "${section.label}"`);
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        return true;
     }
 
     // Function to add easy management interface (for development/admin)
@@ -344,6 +456,7 @@ const FOOD_OPTIONS = {
 Available food types:
 - 'single': Radio button selection (one choice)
 - 'multiple': Checkbox selection (multiple choices)
+- 'multiSection': Multiple sections with different requirements
 
 Example configuration:
 FOOD_OPTIONS['New Food Item'] = {
@@ -1266,7 +1379,7 @@ FOOD_OPTIONS['New Food Item'] = {
         }
     }
 
-    function showPage(pageName) {
+    async function showPage(pageName) {
         // Close existing real-time connection when changing pages
         closeRealTimeConnection();
         
@@ -1569,6 +1682,15 @@ FOOD_OPTIONS['New Food Item'] = {
         const foodSelect = document.getElementById('food');
         if (foodSelect) {
             foodSelect.addEventListener('change', updateFoodOptions);
+            
+            // Debug: Log when food changes
+            foodSelect.addEventListener('change', function() {
+                const selectedFood = this.value;
+                console.log('Selected food:', selectedFood);
+                if (FOOD_OPTIONS[selectedFood]) {
+                    console.log('Food config:', FOOD_OPTIONS[selectedFood]);
+                }
+            });
         }
         
         // Add management interface in debug mode
@@ -1601,6 +1723,11 @@ FOOD_OPTIONS['New Food Item'] = {
             orderForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
+                // Validate food options first
+                if (!validateFoodOptions()) {
+                    return;
+                }
+                
                 const submitBtn = document.getElementById('submitBtn');
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Placing Order...';
@@ -1626,10 +1753,8 @@ FOOD_OPTIONS['New Food Item'] = {
                     this.reset();
                     
                     // Clear dynamic options
-                    const existingOptions = document.getElementById('foodOptions');
-                    if (existingOptions) {
-                        existingOptions.remove();
-                    }
+                    const existingOptions = document.querySelectorAll('[id^="foodOptions"]');
+                    existingOptions.forEach(el => el.remove());
                     
                     debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id} - real-time updates will handle UI refresh`);
                     
@@ -1659,7 +1784,7 @@ FOOD_OPTIONS['New Food Item'] = {
         let clickTimer = null;
         const header = document.querySelector('.header');
         if (header) {
-            header.addEventListener('click', function() {
+            header.addEventListener('click', async function() {
                 clickCount++;
                 
                 // Clear existing timer
