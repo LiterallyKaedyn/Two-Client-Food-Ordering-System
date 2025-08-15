@@ -483,6 +483,10 @@ FOOD_OPTIONS['New Food Item'] = {
             eventSource.close();
         }
         
+        // For now, always use polling since SSE might not be configured
+        // Remove this line when SSE is properly set up
+        sseSupported = false;
+        
         // If SSE is not supported or we've given up, use polling
         if (!sseSupported || isUsingPolling) {
             fallbackToPolling();
@@ -514,17 +518,10 @@ FOOD_OPTIONS['New Food Item'] = {
                 debugLog('🔌 Real-time connection error:', error);
                 showConnectionStatus(false);
                 
-                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    setTimeout(() => {
-                        reconnectAttempts++;
-                        debugLog(`🔄 Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
-                        setupRealTimeUpdates();
-                    }, RECONNECT_DELAY * reconnectAttempts);
-                } else {
-                    debugLog('❌ Max reconnection attempts reached, SSE not available - falling back to polling');
-                    sseSupported = false;
-                    fallbackToPolling();
-                }
+                // Immediately fallback to polling on first error
+                debugLog('❌ SSE not available - falling back to polling immediately');
+                sseSupported = false;
+                fallbackToPolling();
             };
             
             // Auto-reconnect every 20 seconds to handle Vercel timeout
@@ -775,9 +772,9 @@ FOOD_OPTIONS['New Food Item'] = {
     
     // SHORTER intervals for fallback polling to compensate for no real-time updates
     const UPDATE_INTERVALS = {
-        manager: 5000,     // 5 seconds for manager (needs frequent updates)
-        tracking: 8000,    // 8 seconds for tracking
-        order: 15000       // 15 seconds for order page
+        manager: 2000,     // 2 seconds for manager (needs very frequent updates)
+        tracking: 3000,    // 3 seconds for tracking
+        order: 5000        // 5 seconds for order page
     };
     
     function calculateDataHash(orders, recentOrders, kitchenStatus) {
@@ -1135,7 +1132,13 @@ FOOD_OPTIONS['New Food Item'] = {
             
             showMessage('success', `Order #${orderId} has been permanently deleted`);
             
-            debugLog(`[DELETE ORDER] Deletion completed - real-time updates will handle UI refresh`);
+            // Force immediate refresh after successful deletion
+            setTimeout(() => {
+                loadOrders();
+                loadRecentOrders();
+            }, 500);
+            
+            debugLog(`[DELETE ORDER] Deletion completed - forced UI refresh`);
             
         } catch (error) {
             debugLog('[DELETE ORDER] Error:', error);
@@ -1541,7 +1544,13 @@ FOOD_OPTIONS['New Food Item'] = {
             
             showMessage('success', `Order #${orderId} updated to ${newStatus.replace(/-/g, ' ')}`);
             
-            debugLog(`[UPDATE STATUS] Status update completed - real-time updates will handle UI refresh`);
+            // Force immediate refresh after successful update
+            setTimeout(() => {
+                loadOrders();
+                loadRecentOrders();
+            }, 500);
+            
+            debugLog(`[UPDATE STATUS] Status update completed - forced UI refresh`);
             
         } catch (error) {
             debugLog('[UPDATE STATUS] Error:', error);
@@ -1570,7 +1579,13 @@ FOOD_OPTIONS['New Food Item'] = {
             await clearOrders();
             showMessage('success', 'All orders cleared');
             
-            debugLog(`[CLEAR ORDERS] All orders cleared - real-time updates will handle UI refresh`);
+            // Force immediate refresh after clearing
+            setTimeout(() => {
+                loadOrders();
+                loadRecentOrders();
+            }, 500);
+            
+            debugLog(`[CLEAR ORDERS] All orders cleared - forced UI refresh`);
             
         } catch (error) {
             console.error('Clear orders error:', error.message);
@@ -1756,14 +1771,26 @@ FOOD_OPTIONS['New Food Item'] = {
                     const existingOptions = document.querySelectorAll('[id^="foodOptions"]');
                     existingOptions.forEach(el => el.remove());
                     
-                    debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id} - real-time updates will handle UI refresh`);
+                    debugLog(`[NEW ORDER] Enhanced order placed successfully: ${response.order?.id}`);
                     
+                    // Force refresh on manager page if it's open
+                    // This is a workaround since SSE might not be working
                     if (response.order && response.order.id) {
+                        // Force recent orders to update
+                        setTimeout(() => {
+                            loadRecentOrders();
+                        }, 1000);
+                        
+                        // Redirect to tracking page
                         setTimeout(() => {
                             window.location.href = `?id=${response.order.id}`;
                         }, 500);
                     } else {
                         showMessage('success', 'Order placed successfully!');
+                        // Force recent orders to update
+                        setTimeout(() => {
+                            loadRecentOrders();
+                        }, 1000);
                     }
                     
                 } catch (error) {
