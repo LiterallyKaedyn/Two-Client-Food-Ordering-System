@@ -643,85 +643,6 @@ function handleConditionalVisibility(dependencyId, selectedValue) {
     });
 }
 
-// Enhanced function to get selected sub-options including beverage customizations
-function getSelectedSubOptions() {
-    const foodSelect = document.getElementById('food');
-    const selectedFood = foodSelect.value;
-    
-    if (!selectedFood || !FOOD_OPTIONS[selectedFood]) {
-        return '';
-    }
-    
-    const config = FOOD_OPTIONS[selectedFood];
-    
-    if (config.type === 'single') {
-        const selectElement = document.getElementById('foodSubOptions');
-        return selectElement ? selectElement.value : '';
-    } else if (config.type === 'multiple') {
-        const checkboxes = document.querySelectorAll('input[name="foodSubOptions"]:checked');
-        const selected = Array.from(checkboxes).map(cb => cb.value);
-        return selected.length > 0 ? selected.join(', ') : '';
-    } else if (config.type === 'multiSection') {
-        let allSelections = [];
-        
-        config.sections.forEach(section => {
-            const checkboxes = document.querySelectorAll(`input[data-section="${section.id}"]:checked`);
-            const selected = Array.from(checkboxes).map(cb => cb.value);
-            
-            if (selected.length > 0) {
-                allSelections.push(`${section.id}: ${selected.join(', ')}`);
-            }
-        });
-        
-        return allSelections.length > 0 ? allSelections.join(' | ') : '';
-    } else if (config.type === 'beverageCustom') {
-        let beverageOptions = [];
-        
-        config.sections.forEach(section => {
-            const hiddenInput = document.getElementById(`hidden_${section.id}`);
-            if (hiddenInput && hiddenInput.value) {
-                if (section.type === 'counter') {
-                    const value = parseInt(hiddenInput.value);
-                    if (value > 0) {
-                        beverageOptions.push(`${value} sugar`);
-                    } else {
-                        beverageOptions.push('no sugar');
-                    }
-                } else if (section.type === 'boolean') {
-                    const value = hiddenInput.value.toLowerCase();
-                    if (section.id === 'milk') {
-                        if (value === 'yes') {
-                            beverageOptions.push('with milk');
-                        } else {
-                            beverageOptions.push('no milk');
-                        }
-                    } else if (section.id === 'hasCup') {
-                        if (value === 'yes') {
-                            beverageOptions.push('has cup');
-                        } else {
-                            beverageOptions.push('needs cup');
-                        }
-                    }
-                } else if (section.type === 'conditional' && hiddenInput.value) {
-                    // Only include conditional values if they're actually set
-                    const parentSection = config.sections.find(s => s.id === section.dependsOn);
-                    const parentInput = document.getElementById(`hidden_${section.dependsOn}`);
-                    
-                    if (parentInput && parentInput.value === section.showWhen) {
-                        if (section.id === 'cupLocation') {
-                            beverageOptions.push(`cup: ${hiddenInput.value.toLowerCase()}`);
-                        }
-                    }
-                }
-            }
-        });
-        
-        return beverageOptions.length > 0 ? beverageOptions.join(', ') : '';
-    }
-    
-    return '';
-}
-
 // Counter control function for beverages
 function adjustCounter(sectionId, change, min, max) {
     const display = document.getElementById(`counter_${sectionId}`);
@@ -773,6 +694,8 @@ function toggleBoolean(sectionId, selectedOption) {
     console.log(`Boolean ${sectionId}: ${selectedOption}`);
 }
 
+// REMOVE THE DUPLICATE getSelectedSubOptions FUNCTION and replace with this COMPLETE version:
+
 // Enhanced function to get selected sub-options including beverage customizations
 function getSelectedSubOptions() {
     const foodSelect = document.getElementById('food');
@@ -809,9 +732,9 @@ function getSelectedSubOptions() {
         
         config.sections.forEach(section => {
             const hiddenInput = document.getElementById(`hidden_${section.id}`);
-            if (hiddenInput && hiddenInput.value) {
+            if (hiddenInput) {
                 if (section.type === 'counter') {
-                    const value = parseInt(hiddenInput.value);
+                    const value = parseInt(hiddenInput.value) || 0;
                     if (value > 0) {
                         beverageOptions.push(`${value} sugar`);
                     } else {
@@ -819,10 +742,28 @@ function getSelectedSubOptions() {
                     }
                 } else if (section.type === 'boolean') {
                     const value = hiddenInput.value.toLowerCase();
-                    if (value === 'yes') {
-                        beverageOptions.push('with milk');
-                    } else {
-                        beverageOptions.push('no milk');
+                    if (section.id === 'milk') {
+                        if (value === 'yes') {
+                            beverageOptions.push('with milk');
+                        } else {
+                            beverageOptions.push('no milk');
+                        }
+                    } else if (section.id === 'hasCup') {
+                        if (value === 'yes') {
+                            beverageOptions.push('has cup');
+                        } else {
+                            beverageOptions.push('needs cup');
+                        }
+                    }
+                } else if (section.type === 'conditional') {
+                    // Only include conditional values if they're actually visible and set
+                    const parentSection = config.sections.find(s => s.id === section.dependsOn);
+                    const parentInput = document.getElementById(`hidden_${section.dependsOn}`);
+                    
+                    if (parentInput && parentInput.value === section.showWhen && hiddenInput.value) {
+                        if (section.id === 'cupLocation') {
+                            beverageOptions.push(`cup: ${hiddenInput.value.toLowerCase()}`);
+                        }
                     }
                 }
             }
