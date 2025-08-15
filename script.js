@@ -5,27 +5,24 @@
 
 // Easy-to-edit food configuration
 const FOOD_OPTIONS = {
-    'Coco Pops': {
+    // Breakfast items
+    'Up and Go': {
         type: 'single',
         label: 'Milk Type',
-        options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
+        options: ['With Milk', 'With Sugar']
     },
     'Cornflakes': {
         type: 'single',
         label: 'Milk Type',
-        options: ['Full Cream Milk', 'Trim Milk', 'Oat Milk', 'Almond Milk', 'Soy Milk']
+        options: ['With Milk', 'With Sugar']
     },
-    'Toast': {
+    'Coco Pops': {
         type: 'single',
-        label: 'Spread (with optional margarine)',
-        options: ['Jam + Margarine', 'Jam (no margarine)', 'Nutella + Margarine', 'Nutella (no margarine)', 'Marmite + Margarine', 'Marmite (no margarine)', 'Just Margarine']
+        label: 'Additions',
+        options: ['With Milk', 'With Sugar']
     },
-    'Nachos': {
-        type: 'single',
-        label: 'Type',
-        options: ['Vegan Nachos', 'Beef Nachos']
-    },
-    'Chicken Wraps': {
+    // Wraps
+    'Chicken Wrap': {
         type: 'multiSection',
         sections: [
             {
@@ -44,16 +41,63 @@ const FOOD_OPTIONS = {
             }
         ]
     },
-    'Ice Cream': {
+    // Bean Nachos
+    'Bean Nachos': {
+        type: 'multiSection',
+        sections: [
+            {
+                label: 'Inside',
+                id: 'inside',
+                required: false,
+                minRequired: 0,
+                options: ['Corn Chips', 'Sour Cream', 'Cheese']
+            },
+            {
+                label: 'Additional Options (optional)',
+                id: 'additional',
+                required: false,
+                minRequired: 0,
+                options: ['Salad', 'Coleslaw']
+            }
+        ]
+    },
+    // Loaded Fries
+    'Loaded Fries': {
+        type: 'multiSection',
+        sections: [
+            {
+                label: 'Inside',
+                id: 'inside',
+                required: false,
+                minRequired: 0,
+                options: ['Sweet Chilli Sauce', 'Cheese', 'Sour Cream', 'Nacho Mix']
+            },
+            {
+                label: 'Additional Options (optional)',
+                id: 'additional',
+                required: false,
+                minRequired: 0,
+                options: ['Salad Coleslaw']
+            }
+        ]
+    },
+    // Ice Cream
+    'Ice Cream Cone': {
         type: 'single',
         label: 'Flavour',
-        options: ['Vanilla', 'Chocolate']
+        options: ['Cone', 'Fruit Salad']
     },
-    'Fruit': {
+    'Fruit Salad': {
         type: 'single',
-        label: 'Type of Fruit',
-        options: ['Banana', 'Orange', 'Apple', 'Pear', 'Grapes']
-    }
+        label: 'Type',
+        options: ['Regular', 'Large']
+    },
+    // Extras
+    'Ice Blocks': null, // No options needed
+    'Up and Go Extra': null, // No options needed
+    'Muesli Bars': null, // No options needed
+    'Mince and Cheese Pies': null, // No options needed
+    'Vegan Pies': null // No options needed
 };
 
 // ========== MAIN APPLICATION ==========

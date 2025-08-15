@@ -716,18 +716,35 @@
                         <div class="success-message" id="successMessage"></div>
                         <div class="error-message" id="errorMessage"></div>
                         
-                        <form id="orderForm">
-                            <div class="form-group">
+<div class="form-group">
                                 <label for="food">What food do you want:</label>
                                 <select id="food" name="food" required>
                                     <option value="">Select a food item...</option>
-                                    <option value="Coco Pops">Coco Pops</option>
-                                    <option value="Cornflakes">Cornflakes</option>
-                                    <option value="Toast">Toast</option>
-                                    <option value="Nachos">Nachos</option>
-                                    <option value="Chicken Wraps">Chicken Wrap</option>
-                                    <option value="Ice Cream">Ice Cream</option>
-                                    <option value="Fruit">Fruit</option>
+                                    <optgroup label="Breakfast">
+                                        <option value="Up and Go">Up and Go</option>
+                                        <option value="Cornflakes">Cornflakes</option>
+                                        <option value="Coco Pops">Coco Pops</option>
+                                    </optgroup>
+                                    <optgroup label="Wraps">
+                                        <option value="Chicken Wrap">Chicken Wrap</option>
+                                    </optgroup>
+                                    <optgroup label="Bean Nachos">
+                                        <option value="Bean Nachos">Bean Nachos (Vegan)</option>
+                                    </optgroup>
+                                    <optgroup label="Loaded Fries">
+                                        <option value="Loaded Fries">Loaded Fries</option>
+                                    </optgroup>
+                                    <optgroup label="Ice Cream">
+                                        <option value="Ice Cream Cone">Ice Cream Cone</option>
+                                        <option value="Fruit Salad">Fruit Salad</option>
+                                    </optgroup>
+                                    <optgroup label="Extras">
+                                        <option value="Ice Blocks">Ice Blocks</option>
+                                        <option value="Up and Go Extra">Up and Go</option>
+                                        <option value="Muesli Bars">Muesli Bars</option>
+                                        <option value="Mince and Cheese Pies">Mince and Cheese Pies</option>
+                                        <option value="Vegan Pies">Vegan Pies</option>
+                                    </optgroup>
                                 </select>
                             </div>
 
