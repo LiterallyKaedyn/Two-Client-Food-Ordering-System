@@ -1,20 +1,45 @@
-// api/orders.js - Enhanced with Server-Sent Events for real-time updates
+// api/orders.js - Enhanced with Request Tracking and Environment Variable Authentication
 import { Redis } from '@upstash/redis';
+
+// Request tracking middleware
+const trackRequest = async (redis, method, endpoint, status, data = {}) => {
+  try {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      method,
+      endpoint,
+      status,
+      data: data ? JSON.stringify(data).substring(0, 100) : '', // Limit data size
+      ip: data.ip || 'unknown'
+    };
+    
+    // Store in a circular buffer of last 100 requests
+    const LOG_KEY = 'food_order_request_log';
+    await redis.lpush(LOG_KEY, JSON.stringify(logEntry));
+    await redis.ltrim(LOG_KEY, 0, 99);
+    await redis.expire(LOG_KEY, 86400); // Keep for 24 hours
+  } catch (error) {
+    console.error('[REQUEST TRACKING] Failed to log request:', error);
+  }
+};
 
 export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Manager-Key');
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
+  const redis = Redis.fromEnv();
+  const clientIp = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
+
   try {
     const { method } = req;
-    console.log(`[API] ${method} ${req.url}`);
+    console.log(`[API] ${method} ${req.url} from ${clientIp}`);
 
     // Parse URL and query parameters
     const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -22,9 +47,6 @@ export default async function handler(req, res) {
     const searchParams = urlObj.searchParams;
 
     console.log(`[API] Parsed URL - pathname: ${pathname}, search: ${urlObj.search}`);
-
-    // Initialize Upstash Redis client
-    const redis = Redis.fromEnv();
     
     // Redis keys
     const DATA_KEY = 'food_order_data';
@@ -40,10 +62,9 @@ export default async function handler(req, res) {
           id: Math.random().toString(36).substr(2, 9)
         };
         
-        // Store event in Redis with expiration
         await redis.lpush(EVENTS_KEY, JSON.stringify(event));
-        await redis.expire(EVENTS_KEY, 300); // Keep events for 5 minutes
-        await redis.ltrim(EVENTS_KEY, 0, 99); // Keep only last 100 events
+        await redis.expire(EVENTS_KEY, 300);
+        await redis.ltrim(EVENTS_KEY, 0, 99);
         
         console.log(`[BROADCAST] Event sent: ${eventType}`, data);
       } catch (error) {
@@ -92,11 +113,10 @@ export default async function handler(req, res) {
           });
         }
 
-        console.log(`[API] Data loaded from Redis - ${validatedData.orders.length} active, ${validatedData.completedOrders.length} completed, kitchen: ${validatedData.kitchenOpen}`);
+        console.log(`[API] Data loaded - ${validatedData.orders.length} active, ${validatedData.completedOrders.length} completed`);
         return validatedData;
       } catch (err) {
         console.error('[API] Could not read from Redis:', err.message);
-        // Return default data structure
         const defaultData = {
           orders: [],
           completedOrders: [],
@@ -105,7 +125,6 @@ export default async function handler(req, res) {
           lastUpdated: new Date().toISOString()
         };
         
-        // Try to create the default data in Redis
         try {
           await redis.set(DATA_KEY, defaultData);
           console.log('[API] Created new data in Redis with defaults');
@@ -120,13 +139,9 @@ export default async function handler(req, res) {
     // Helper to save data to Upstash Redis
     async function saveData(data) {
       try {
-        // Add timestamp for debugging
         data.lastUpdated = new Date().toISOString();
-        
         await redis.set(DATA_KEY, data);
         console.log('[API] Data saved successfully to Upstash Redis');
-        
-        // Optional: Set expiration for automatic cleanup (e.g., 30 days)
         await redis.expire(DATA_KEY, 30 * 24 * 60 * 60); // 30 days
       } catch (err) {
         console.error('[API] Failed to save data to Redis:', err.message);
@@ -150,6 +165,19 @@ export default async function handler(req, res) {
       });
     }
 
+    // Check manager authentication
+    function checkManagerAuth(req) {
+      const managerKey = req.headers['x-manager-key'];
+      const expectedKey = process.env.MANAGER_PORTAL_KEY;
+      
+      if (!expectedKey) {
+        console.error('[AUTH] MANAGER_PORTAL_KEY environment variable not set');
+        return false;
+      }
+      
+      return managerKey === expectedKey;
+    }
+
     // Generate order ID with proper formatting
     function generateOrderId(nextId) {
       return nextId.toString().padStart(3, '0');
@@ -160,7 +188,64 @@ export default async function handler(req, res) {
     // Only handle /api/orders path
     if (pathname !== '/api/orders') {
       console.log(`[API] Invalid path: ${pathname}`);
+      await trackRequest(redis, method, pathname, 404, { ip: clientIp });
       return res.status(404).json({ error: "Endpoint not found" });
+    }
+
+    // Request log endpoint (manager only)
+    if (searchParams.has('request-log')) {
+      if (!checkManagerAuth(req)) {
+        await trackRequest(redis, method, 'request-log', 401, { ip: clientIp });
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      if (method === 'GET') {
+        try {
+          const logs = await redis.lrange('food_order_request_log', 0, 99);
+          const parsedLogs = logs.map(log => {
+            try {
+              return JSON.parse(log);
+            } catch (e) {
+              return log;
+            }
+          });
+          
+          await trackRequest(redis, method, 'request-log', 200, { ip: clientIp });
+          return res.status(200).json({ logs: parsedLogs });
+        } catch (err) {
+          console.error('[API] Failed to get request logs:', err.message);
+          await trackRequest(redis, method, 'request-log', 500, { ip: clientIp, error: err.message });
+          return res.status(500).json({ error: 'Failed to retrieve logs' });
+        }
+      }
+      
+      return res.status(405).json({ error: `Method ${method} not allowed for request-log` });
+    }
+
+    // Manager authentication check endpoint
+    if (searchParams.has('check-auth')) {
+      if (method === 'POST') {
+        const body = await parseBody(req);
+        const providedKey = body.key;
+        const expectedKey = process.env.MANAGER_PORTAL_KEY;
+        
+        if (!expectedKey) {
+          console.error('[AUTH] MANAGER_PORTAL_KEY environment variable not set');
+          await trackRequest(redis, method, 'check-auth', 500, { ip: clientIp });
+          return res.status(500).json({ error: 'Server configuration error' });
+        }
+        
+        const isValid = providedKey === expectedKey;
+        await trackRequest(redis, method, 'check-auth', isValid ? 200 : 401, { ip: clientIp });
+        
+        if (isValid) {
+          return res.status(200).json({ valid: true });
+        } else {
+          return res.status(401).json({ valid: false });
+        }
+      }
+      
+      return res.status(405).json({ error: `Method ${method} not allowed for check-auth` });
     }
 
     // Handle kitchen status routes
@@ -170,36 +255,32 @@ export default async function handler(req, res) {
       if (method === 'GET') {
         try {
           const data = await getCurrentData();
-          console.log(`[API] Kitchen status GET - returning: ${data.kitchenOpen}`);
+          await trackRequest(redis, method, 'kitchen-status-get', 200, { ip: clientIp, isOpen: data.kitchenOpen });
           return res.status(200).json({ 
             isOpen: data.kitchenOpen,
             lastUpdated: data.lastUpdated
           });
         } catch (err) {
-          console.error('[API] Failed to get kitchen status:', err.message);
-          return res.status(200).json({ isOpen: false });
+          await trackRequest(redis, method, 'kitchen-status-get', 500, { ip: clientIp, error: err.message });
+          return res.status(500).json({ error: 'Failed to get kitchen status' });
         }
       }
       
       if (method === 'POST') {
+        // Require manager auth for changing kitchen status
+        if (!checkManagerAuth(req)) {
+          await trackRequest(redis, method, 'kitchen-status-post', 401, { ip: clientIp });
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
         try {
-          console.log('[API] Kitchen status POST - parsing body...');
           const body = await parseBody(req);
-          console.log('[API] Kitchen status POST - body received:', body);
-          
           const data = await getCurrentData();
-          console.log('[API] Kitchen status POST - current data loaded');
-          
           const previousStatus = data.kitchenOpen;
           
-          // Update kitchen status only
           data.kitchenOpen = Boolean(body.isOpen);
-          console.log(`[API] Kitchen status POST - updating to: ${data.kitchenOpen}`);
-          
           await saveData(data);
-          console.log('[API] Kitchen status POST - data saved successfully to Redis');
 
-          // Broadcast kitchen status change event
           if (previousStatus !== data.kitchenOpen) {
             await broadcastEvent('KITCHEN_STATUS_CHANGED', {
               isOpen: data.kitchenOpen,
@@ -207,13 +288,19 @@ export default async function handler(req, res) {
             });
           }
 
+          await trackRequest(redis, method, 'kitchen-status-post', 200, { 
+            ip: clientIp, 
+            isOpen: data.kitchenOpen,
+            changed: previousStatus !== data.kitchenOpen 
+          });
+          
           return res.status(200).json({ 
             success: true, 
             isOpen: data.kitchenOpen,
             lastUpdated: data.lastUpdated
           });
         } catch (err) {
-          console.error('[API] Failed to update kitchen status:', err.message);
+          await trackRequest(redis, method, 'kitchen-status-post', 500, { ip: clientIp, error: err.message });
           return res.status(500).json({ 
             error: "Failed to update kitchen status",
             details: err.message 
@@ -226,8 +313,6 @@ export default async function handler(req, res) {
 
     // Handle completed orders route
     if (searchParams.has('completed-orders')) {
-      console.log('[API] Completed orders route');
-      
       if (method === 'GET') {
         try {
           const data = await getCurrentData();
@@ -242,10 +327,11 @@ export default async function handler(req, res) {
           })
           .slice(0, 10);
           
+          await trackRequest(redis, method, 'completed-orders', 200, { ip: clientIp, count: allRecentOrders.length });
           return res.status(200).json(allRecentOrders);
         } catch (err) {
-          console.error('[API] Failed to get completed orders:', err.message);
-          return res.status(200).json([]);
+          await trackRequest(redis, method, 'completed-orders', 500, { ip: clientIp, error: err.message });
+          return res.status(500).json({ error: 'Failed to get completed orders' });
         }
       }
       
@@ -254,29 +340,27 @@ export default async function handler(req, res) {
 
     // Handle update order status
     if (searchParams.has('update-order')) {
-      console.log('[API] Update order route');
+      // Require manager auth for updating orders
+      if (!checkManagerAuth(req)) {
+        await trackRequest(redis, method, 'update-order', 401, { ip: clientIp });
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
       
       if (method === 'PUT' || method === 'POST') {
         try {
           const body = await parseBody(req);
           const data = await getCurrentData();
-          
           const orderId = searchParams.get('update-order');
-          console.log(`[API] Update request for order ${orderId} with status: ${body.status}`);
-          
           const orderIndex = data.orders.findIndex(order => order.id === orderId);
           
           if (orderIndex === -1) {
-            console.log(`[API] Order ${orderId} not found in active orders`);
+            await trackRequest(redis, method, 'update-order', 404, { ip: clientIp, orderId });
             return res.status(404).json({ error: 'Order not found' });
           }
           
           const previousStatus = data.orders[orderIndex].status;
-          
-          // Update order
           data.orders[orderIndex] = { ...data.orders[orderIndex], ...body };
           
-          // If order is completed, move it to completed orders
           if (body.status === 'completed') {
             const completedOrder = {
               ...data.orders[orderIndex],
@@ -300,8 +384,6 @@ export default async function handler(req, res) {
           }
           
           await saveData(data);
-          
-          // Broadcast order status update event
           await broadcastEvent('ORDER_STATUS_UPDATED', {
             orderId,
             newStatus: body.status,
@@ -311,7 +393,13 @@ export default async function handler(req, res) {
               data.orders[orderIndex] || data.orders.find(o => o.id === orderId)
           });
           
-          console.log(`[API] Order ${orderId} updated successfully to status: ${body.status}`);
+          await trackRequest(redis, method, 'update-order', 200, { 
+            ip: clientIp, 
+            orderId, 
+            newStatus: body.status,
+            previousStatus 
+          });
+          
           return res.status(200).json({
             success: true,
             message: 'Order updated',
@@ -321,7 +409,7 @@ export default async function handler(req, res) {
           });
           
         } catch (err) {
-          console.error('[API] Failed to update order:', err.message);
+          await trackRequest(redis, method, 'update-order', 500, { ip: clientIp, error: err.message });
           return res.status(500).json({ error: "Failed to update order: " + err.message });
         }
       }
@@ -331,19 +419,20 @@ export default async function handler(req, res) {
 
     // Handle delete order
     if (searchParams.has('delete-order')) {
-      console.log('[API] Delete order route');
+      // Require manager auth for deleting orders
+      if (!checkManagerAuth(req)) {
+        await trackRequest(redis, method, 'delete-order', 401, { ip: clientIp });
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
       
       if (method === 'DELETE') {
         try {
           const data = await getCurrentData();
-          
           const orderId = searchParams.get('delete-order');
-          console.log(`[API] Delete request for order ${orderId}`);
-          
           const orderIndex = data.orders.findIndex(order => order.id === orderId);
           
           if (orderIndex === -1) {
-            console.log(`[API] Order ${orderId} not found in active orders`);
+            await trackRequest(redis, method, 'delete-order', 404, { ip: clientIp, orderId });
             return res.status(404).json({ error: 'Order not found' });
           }
           
@@ -351,8 +440,6 @@ export default async function handler(req, res) {
           data.orders.splice(orderIndex, 1);
           
           await saveData(data);
-          
-          // Broadcast order deletion event
           await broadcastEvent('ORDER_DELETED', {
             orderId,
             deletedOrder: {
@@ -362,7 +449,8 @@ export default async function handler(req, res) {
             }
           });
           
-          console.log(`[API] Order ${orderId} deleted permanently`);
+          await trackRequest(redis, method, 'delete-order', 200, { ip: clientIp, orderId });
+          
           return res.status(200).json({
             success: true,
             message: 'Order deleted permanently',
@@ -374,7 +462,7 @@ export default async function handler(req, res) {
           });
           
         } catch (err) {
-          console.error('[API] Failed to delete order:', err.message);
+          await trackRequest(redis, method, 'delete-order', 500, { ip: clientIp, error: err.message });
           return res.status(500).json({ error: "Failed to delete order: " + err.message });
         }
       }
@@ -383,16 +471,18 @@ export default async function handler(req, res) {
     }
 
     // Handle main orders routes
-    if (!searchParams.has('kitchen-status') && !searchParams.has('completed-orders') && !searchParams.has('update-order') && !searchParams.has('delete-order')) {
+    if (!searchParams.has('kitchen-status') && !searchParams.has('completed-orders') && 
+        !searchParams.has('update-order') && !searchParams.has('delete-order') &&
+        !searchParams.has('check-auth') && !searchParams.has('request-log')) {
       
       // GET all orders
       if (method === 'GET') {
         try {
           const data = await getCurrentData();
-          console.log(`[API] Returning ${data.orders.length} active orders`);
+          await trackRequest(redis, method, 'get-orders', 200, { ip: clientIp, count: data.orders.length });
           return res.status(200).json(data.orders);
         } catch (err) {
-          console.error('[API] Failed to get orders:', err.message);
+          await trackRequest(redis, method, 'get-orders', 500, { ip: clientIp, error: err.message });
           return res.status(500).json({ error: 'Failed to get orders: ' + err.message });
         }
       }
@@ -403,9 +493,12 @@ export default async function handler(req, res) {
           const body = await parseBody(req);
           const data = await getCurrentData();
           
-          // Clear all orders
+          // Clear all orders (manager only)
           if (Array.isArray(body) && body.length === 0) {
-            console.log('[API] Clearing all orders');
+            if (!checkManagerAuth(req)) {
+              await trackRequest(redis, method, 'clear-orders', 401, { ip: clientIp });
+              return res.status(401).json({ error: 'Unauthorized' });
+            }
             
             const activeOrders = data.orders.map(order => ({
               ...order,
@@ -422,18 +515,17 @@ export default async function handler(req, res) {
             }));
             
             data.completedOrders = [...data.completedOrders, ...activeOrders];
-            
             if (data.completedOrders.length > 50) {
               data.completedOrders = data.completedOrders.slice(-50);
             }
             
             data.orders = [];
             await saveData(data);
-            
-            // Broadcast orders cleared event
             await broadcastEvent('ORDERS_CLEARED', {
               clearedCount: activeOrders.length
             });
+            
+            await trackRequest(redis, method, 'clear-orders', 200, { ip: clientIp, clearedCount: activeOrders.length });
             
             return res.status(200).json({ 
               success: true, 
@@ -442,8 +534,6 @@ export default async function handler(req, res) {
           } 
           // Add new order
           else if (body && typeof body === 'object' && body.food && body.room && body.name) {
-            console.log('[API] Adding new order');
-            
             const orderId = generateOrderId(data.nextOrderId);
             
             const newOrder = {
@@ -461,31 +551,37 @@ export default async function handler(req, res) {
                 minute: '2-digit',
                 second: '2-digit'
               }),
-              status: 'pending'
+              status: 'pending',
+              submittedBy: clientIp
             };
             
             data.orders.push(newOrder);
             data.nextOrderId += 1;
             
             await saveData(data);
-
-            // Broadcast new order event
             await broadcastEvent('NEW_ORDER', {
               order: newOrder,
               totalOrders: data.orders.length
             });
 
-            console.log(`[API] Order ${orderId} created successfully`);
+            await trackRequest(redis, method, 'create-order', 201, { 
+              ip: clientIp, 
+              orderId,
+              food: body.food,
+              room: body.room 
+            });
+            
             return res.status(201).json({ 
               success: true, 
               message: 'Order created',
               order: newOrder
             });
           } else {
+            await trackRequest(redis, method, 'create-order', 400, { ip: clientIp });
             return res.status(400).json({ error: 'Invalid order data' });
           }
         } catch (err) {
-          console.error('[API] Failed to process order:', err.message);
+          await trackRequest(redis, method, 'post-orders', 500, { ip: clientIp, error: err.message });
           return res.status(500).json({ 
             error: "Failed to process order", 
             details: err.message
@@ -497,12 +593,13 @@ export default async function handler(req, res) {
     }
 
     // 404 for everything else
-    console.log(`[API] No matching route for ${method} ${pathname} with params:`, Object.fromEntries(searchParams));
+    await trackRequest(redis, method, pathname, 404, { ip: clientIp });
     return res.status(404).json({ error: "Endpoint not found" });
 
   } catch (err) {
     // Global error handler
     console.error('[API] Unhandled error:', err);
+    await trackRequest(redis, 'ERROR', 'unhandled', 500, { ip: clientIp, error: err.message });
     return res.status(500).json({ 
       error: "Internal server error", 
       details: err.message,

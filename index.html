@@ -31,7 +31,7 @@
             overflow: hidden;
             backdrop-filter: blur(10px);
             border: 3px solid #000;
-            margin-bottom: 60px; /* Space for fixed footer */
+            margin-bottom: 60px;
         }
 
         .header {
@@ -166,7 +166,6 @@
             transform: translateY(-2px);
         }
 
-        /* Enhanced Food Selection Styles */
         .checkbox-group {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -217,14 +216,12 @@
             transform: scale(1.1);
         }
 
-        /* Checked state for checkbox items */
         .checkbox-item:has(input[type="checkbox"]:checked) {
             background: #FFF3E0;
             border-color: #FF6B35;
             box-shadow: 0 2px 5px rgba(255, 107, 53, 0.2);
         }
 
-        /* Validation feedback styling */
         .form-group small {
             display: block;
             margin-top: 5px;
@@ -233,7 +230,6 @@
             transition: color 0.3s ease;
         }
 
-        /* Section divider for multiple option groups */
         [id^="foodOptions"] {
             animation: slideDown 0.3s ease;
             margin-bottom: 20px;
@@ -255,7 +251,6 @@
             }
         }
 
-        /* Ensure dynamic options inherit form styling */
         #foodOptions select, [id^="foodOptions"] select {
             width: 100%;
             padding: 15px;
@@ -479,7 +474,7 @@
             color: white;
         }
 
-        .clear-all-btn, .refresh-btn, .kitchen-status-btn {
+        .clear-all-btn, .refresh-btn, .kitchen-status-btn, .test-sound-btn, .activity-log-btn {
             border: 3px solid #000;
             padding: 12px 25px;
             border-radius: 8px;
@@ -512,7 +507,17 @@
             background: #DC3545;
         }
 
-        .clear-all-btn:hover, .refresh-btn:hover, .kitchen-status-btn:hover {
+        .test-sound-btn {
+            background: #FFC107;
+            color: #000;
+        }
+
+        .activity-log-btn {
+            background: #6F42C1;
+            color: white;
+        }
+
+        .clear-all-btn:hover, .refresh-btn:hover, .kitchen-status-btn:hover, .test-sound-btn:hover, .activity-log-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
@@ -696,6 +701,236 @@
             background: #6C757D;
         }
 
+        /* Request Logger Styles */
+        .request-logger {
+            position: fixed;
+            bottom: 70px;
+            right: 10px;
+            width: 400px;
+            max-height: 300px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            border: 2px solid #0f0;
+        }
+
+        .request-logger.active {
+            display: block;
+        }
+
+        .request-log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+        }
+
+        .request-log-entry.success {
+            color: #0f0;
+        }
+
+        .request-log-entry.error {
+            color: #f00;
+        }
+
+        .request-log-entry.pending {
+            color: #ff0;
+        }
+
+        /* Counter and Beverage Control Styles */
+        .counter-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+        }
+
+        .counter-control label {
+            margin: 0;
+            font-weight: 600;
+            min-width: 140px;
+        }
+
+        .counter-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .counter-btn {
+            width: 35px;
+            height: 35px;
+            border: 2px solid #FF6B35;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            color: #FF6B35;
+        }
+
+        .counter-btn:hover {
+            background: #FF6B35;
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .counter-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .counter-display {
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            color: #FF6B35;
+            background: white;
+            border: 2px solid #FF6B35;
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        .beverage-option {
+            margin-bottom: 15px;
+        }
+
+        .boolean-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+        }
+
+        .boolean-control label {
+            margin: 0;
+            font-weight: 600;
+            min-width: 140px;
+        }
+
+        .boolean-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .boolean-btn {
+            padding: 8px 16px;
+            border: 2px solid #FF6B35;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            color: #FF6B35;
+        }
+
+        .boolean-btn:hover {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .boolean-btn.active {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .conditional-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+            background: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #17a2b8;
+            transition: all 0.3s ease;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        .conditional-control.visible {
+            opacity: 1;
+            border-color: #FF6B35;
+            background: #fff3e0;
+            max-height: 100px;
+            margin-top: 10px;
+            padding: 15px;
+        }
+
+        .conditional-control label {
+            margin: 0;
+            font-weight: 600;
+            min-width: 140px;
+            color: #17a2b8;
+        }
+
+        .conditional-control.visible label {
+            color: #FF6B35;
+        }
+
+        .conditional-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .conditional-btn {
+            padding: 8px 16px;
+            border: 2px solid #17a2b8;
+            background: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            color: #17a2b8;
+            opacity: 0.7;
+        }
+
+        .conditional-control.visible .conditional-btn {
+            border-color: #FF6B35;
+            color: #FF6B35;
+            opacity: 1;
+        }
+
+        .conditional-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .conditional-control.visible .conditional-btn:hover {
+            background: #FF6B35;
+            color: white;
+        }
+
+        .conditional-btn.active {
+            opacity: 1;
+        }
+
+        .conditional-control.visible .conditional-btn.active {
+            background: #FF6B35;
+            color: white;
+        }
+
         @media (max-width: 768px) {
             .main-layout {
                 flex-direction: column;
@@ -732,201 +967,23 @@
             .checkbox-group {
                 grid-template-columns: 1fr;
             }
+
+            .request-logger {
+                width: calc(100% - 20px);
+                left: 10px;
+                right: 10px;
+            }
+
+            .counter-control, .boolean-control, .conditional-control {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .counter-control label, .boolean-control label, .conditional-control label {
+                min-width: auto;
+            }
         }
-        /* Counter control styles for beverages */
-.counter-control {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-top: 10px;
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    border: 2px solid #e9ecef;
-}
-
-.counter-control label {
-    margin: 0;
-    font-weight: 600;
-    min-width: 140px;
-}
-
-.counter-buttons {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.counter-btn {
-    width: 35px;
-    height: 35px;
-    border: 2px solid #FF6B35;
-    background: white;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 18px;
-    transition: all 0.3s ease;
-    color: #FF6B35;
-}
-
-.counter-btn:hover {
-    background: #FF6B35;
-    color: white;
-    transform: scale(1.1);
-}
-
-.counter-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.counter-display {
-    min-width: 40px;
-    text-align: center;
-    font-weight: bold;
-    font-size: 18px;
-    color: #FF6B35;
-    background: white;
-    border: 2px solid #FF6B35;
-    border-radius: 8px;
-    padding: 8px 12px;
-}
-
-.beverage-option {
-    margin-bottom: 15px;
-}
-
-.boolean-control {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-top: 10px;
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    border: 2px solid #e9ecef;
-}
-
-.boolean-control label {
-    margin: 0;
-    font-weight: 600;
-    min-width: 140px;
-}
-
-.boolean-buttons {
-    display: flex;
-    gap: 10px;
-}
-
-.boolean-btn {
-    padding: 8px 16px;
-    border: 2px solid #FF6B35;
-    background: white;
-    border-radius: 20px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    color: #FF6B35;
-}
-
-.boolean-btn:hover {
-    background: #FF6B35;
-    color: white;
-}
-
-.boolean-btn.active {
-    background: #FF6B35;
-    color: white;
-}
-
-/* Conditional field styles */
-.conditional-control {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-top: 10px;
-    background: #e8f4f8;
-    padding: 15px;
-    border-radius: 8px;
-    border: 2px solid #17a2b8;
-    transition: all 0.3s ease;
-    opacity: 0.6;
-}
-
-.conditional-control.visible {
-    opacity: 1;
-    border-color: #FF6B35;
-    background: #fff3e0;
-}
-
-.conditional-control label {
-    margin: 0;
-    font-weight: 600;
-    min-width: 140px;
-    color: #17a2b8;
-}
-
-.conditional-control.visible label {
-    color: #FF6B35;
-}
-
-.conditional-buttons {
-    display: flex;
-    gap: 10px;
-}
-
-.conditional-btn {
-    padding: 8px 16px;
-    border: 2px solid #17a2b8;
-    background: white;
-    border-radius: 20px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    color: #17a2b8;
-    opacity: 0.7;
-}
-
-.conditional-control.visible .conditional-btn {
-    border-color: #FF6B35;
-    color: #FF6B35;
-    opacity: 1;
-}
-
-.conditional-btn:hover {
-    transform: scale(1.05);
-}
-
-.conditional-control.visible .conditional-btn:hover {
-    background: #FF6B35;
-    color: white;
-}
-
-.conditional-btn.active {
-    opacity: 1;
-}
-
-.conditional-control.visible .conditional-btn.active {
-    background: #FF6B35;
-    color: white;
-}
-
-@media (max-width: 768px) {
-    .counter-control, .boolean-control, .conditional-control {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    
-    .counter-control label, .boolean-control label, .conditional-control label {
-        min-width: auto;
-    }
-}
     </style>
 </head>
 <body>
@@ -942,149 +999,19 @@
                 <!-- Order Form Page -->
                 <div id="orderPage" class="page active">
                     <!-- Kitchen Closed Message -->
-                    <div id="kitchenClosedMessage" class="kitchen-closed-message" style="display: none;">
+                    <div class="kitchen-closed-message">
                         <h2>The Kitchen Is Closed!</h2>
                         <p>We're sorry, nobody is available to complete your order at the moment.</p>
                         <p>Please check back later.</p>
                     </div>
-
-                    <!-- Order Form (hidden when kitchen closed) -->
-                    <div id="orderFormContainer">
-                        <div class="success-message" id="successMessage"></div>
-                        <div class="error-message" id="errorMessage"></div>
-                        
-                        <form id="orderForm">
-                            <div class="form-group">
-                                <label for="food">What food do you want:</label>
-                                <select id="food" name="food" required>
-                                    <option value="">Select a food item...</option>
-                                    <optgroup label="Breakfast">
-                                        <option value="Up and Go">Up and Go</option>
-                                        <option value="Cornflakes">Cornflakes</option>
-                                        <option value="Coco Pops">Coco Pops</option>
-                                    </optgroup>
-                                    <optgroup label="Wraps">
-                                        <option value="Chicken Wrap">Chicken Wrap</option>
-                                    </optgroup>
-                                    <optgroup label="Bean Nachos">
-                                        <option value="Bean Nachos">Bean Nachos (Vegan)</option>
-                                    </optgroup>
-                                    <optgroup label="Loaded Fries">
-                                        <option value="Loaded Fries">Loaded Fries</option>
-                                    </optgroup>
-                                    <optgroup label="Ice Cream">
-                                        <option value="Ice Cream Cone">Ice Cream Cone</option>
-                                        <option value="Fruit Salad">Fruit Salad</option>
-                                    </optgroup>
-                                    <optgroup label="Extras">
-                                        <option value="Ice Blocks">Ice Blocks</option>
-                                        <option value="Up and Go Extra">Up and Go</option>
-                                        <option value="Muesli Bars">Muesli Bars</option>
-                                        <option value="Mince and Cheese Pies">Mince and Cheese Pies</option>
-                                        <option value="Vegan Pies">Vegan Pies</option>
-                                    </optgroup>
-                                    <optgroup label="Hot Beverages">
-                                        <option value="Hot Chocolate">Hot Chocolate</option>
-                                        <option value="Cappuccino">Cappuccino</option>
-                                        <option value="Tea">Tea</option>
-                                    </optgroup>
-                                    <optgroup label="Cold Beverages">
-                                        <option value="Water">Water</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-
-                            <!-- Dynamic options will be inserted here automatically when food is selected -->
-                            <!-- For Chicken Wrap: Multiple checkboxes for "Inside" (min 2 required) and "Additional" options -->
-                            <!-- For Bean Nachos: Multiple checkboxes for ingredients -->
-                            <!-- For Loaded Fries: Multiple checkboxes for toppings -->
-                            <!-- For other items: Single dropdown selection or no options -->
-
-                            <div class="form-group">
-                                <label for="comments">Special requests / Allergies (Optional):</label>
-                                <textarea id="comments" name="comments" placeholder="e.g., No Onions, Gluten-Free, Nut Allergy, Extra Sauce, Vegan (For Echo), etc.."></textarea>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="room">What room are you in:</label>
-                                <input type="text" id="room" name="room" required placeholder="e.g., RT1, Info Hub, etc..">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="name">What is your name:</label>
-                                <input type="text" id="name" name="name" required placeholder="Your first name.">
-                            </div>
-                            
-                            <button type="submit" class="submit-btn" id="submitBtn">Place Order</button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Manager Page -->
-                <div id="managerPage" class="page">
-                    <div class="new-order-notification" id="newOrderNotification">
-                        🔔 New order received!
-                    </div>
-                    <div class="manager-controls">
-                        <button class="kitchen-status-btn" id="kitchenToggle" onclick="toggleKitchenStatus()">Open Kitchen</button>
-                        <button class="refresh-btn" onclick="loadOrders()">Refresh Active Order List</button>
-                        <button class="clear-all-btn" onclick="clearAllOrders()">Clear All Active Orders</button>
-                        <button class="clear-all-btn" onclick="logoutManager()" style="background: #6c757d;">Logout</button>
-                    </div>
-                    <div class="loading" id="loading">Loading active orders...</div>
-                    <div id="ordersContainer" class="orders-container"></div>
-                    <div id="noOrders" class="no-orders" style="display: none;">
-                        No orders yet! 📝<br>
-                        Orders will appear here as they are placed.
-                    </div>
-                </div>
-
-                <!-- Order Tracking Page -->
-                <div id="trackingPage" class="page">
-                    <div class="order-tracking">
-                        <div class="order-id-display">
-                            <h2 id="trackingOrderId">#001</h2>
-                            <p>Your Order</p>
-                        </div>
-                        
-                        <div class="order-details-card" id="trackingOrderDetails">
-                            <div class="loading">Loading order details...</div>
-                        </div>
-
-                        <div class="status-timeline">
-                            <div class="timeline-step" data-status="pending">
-                                <div class="timeline-circle">1</div>
-                                <p>Pending</p>
-                            </div>
-                            <div class="timeline-step" data-status="accepted">
-                                <div class="timeline-circle">2</div>
-                                <p>Accepted</p>
-                            </div>
-                            <div class="timeline-step" data-status="being-made">
-                                <div class="timeline-circle">3</div>
-                                <p>Being Made</p>
-                            </div>
-                            <div class="timeline-step" data-status="being-delivered">
-                                <div class="timeline-circle">4</div>
-                                <p>Being Delivered</p>
-                            </div>
-                            <div class="timeline-step" data-status="completed">
-                                <div class="timeline-circle">5</div>
-                                <p>Completed</p>
-                            </div>
-                        </div>
-
-                        <button onclick="goToOrderPage()" style="margin-top: 30px; padding: 15px 30px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 10px; cursor: pointer;">
-                            Place Another Order
-                        </button>
-                    </div>
                 </div>
             </div>
+        </div>
 
             <div class="sidebar">
                 <h3>Recent Orders</h3>
                 <div id="completedOrdersList">
-                    <div class="loading">Loading recent orders...</div>
+                    <div class="loading">Recent orders unavailable...</div>
                 </div>
             </div>
         </div>
@@ -1093,10 +1020,5 @@
     <div class="footer">
         ©2025 Kaedyn Eastall. All Rights Reserved.<br>Powered by Upstash Redis.
     </div>
-
-    <!-- Hidden manager access link -->
-    <a href="?page=manager" class="manager-access" id="managerAccess">Manager</a>
-
-    <script src="script.js"></script>
 </body>
 </html>
